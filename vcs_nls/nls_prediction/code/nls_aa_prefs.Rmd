@@ -1,0 +1,149 @@
+---
+title: "nls_aa_preferences"
+author: "Nick Hasle"
+date: "January 16, 2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load packages}
+library(ggplot2) 
+library(readr)
+library(dplyr)
+library(reshape2)
+library(Biostrings)
+library(UniProt.ws)
+
+
+```
+
+
+## Objective
+Use method from Bloom 2017 to determine amino acid preferences at each position.
+
+```{r load score data}
+# load score data
+scores <- read.csv('../../nls_scores/code/summary_scores_filtered.csv')
+wt_raw_score <- scores[which(scores$X == '_wt'),'mean_raw_score']
+
+```
+
+## Process score data
+
+```{r process score data}
+# save wt score and then remove
+
+scores <- scores[which(scores$X != '_wt'),]
+
+# include only missense scores (add wt back later)
+scores <- scores[which(scores$mt_type == 'mis'),]
+
+# recode aa_pos as numeric
+scores$aa_pos <- as.numeric(as.character(scores$aa_pos))
+
+# create vector of median scores by position
+median_scores <- sapply(seq(1, max(scores$aa_pos)), function(pos) {
+  
+  # calculate median value from the scores matrix
+  return(median(scores[which(
+                              scores$aa_pos == pos &
+                              !is.na(scores$mean_raw_score)),
+                              'mean_raw_score']))
+})
+
+# for missing positions, make it equal to the median score at that position
+missing_scores = which(is.na(scores$mean_raw_score))
+
+scores[missing_scores,'mean_raw_score'] = median_scores[scores[missing_scores, 'aa_pos']]
+
+# add wt for each position back in and set score to 1
+scores <- bind_rows(lapply(seq(min(scores$aa_pos), max(scores$aa_pos)), function(pos) {
+  
+  # get the sub dataframe for this position
+  scores_pos <- scores[which(scores$aa_pos == pos),]
+  
+  # check that there is only one unique wt amino acid
+  if(length(unique(scores_pos$wt_aa)) != 1) { print(paste0('ERROR: multiple possible WT amino acids for position ', pos))}
+  
+  # get the wt_amino acid for this position
+  wt_aa = unique(as.character(scores_pos$wt_aa))[[1]]
+  
+  # change columns 1, 3, 4, and 5 to be characters
+  scores_pos[,c(1,3,4,5)] = apply(scores_pos[,c(1,3,4,5)], 2, as.character)
+  
+  # make a new row
+  scores_pos[nrow(scores_pos) + 1, ] = 
+    
+    c(paste0(wt_aa,pos,wt_aa), pos, wt_aa, 'wt', wt_aa, wt_raw_score, NA, 1, NA)
+  
+  return(scores_pos)
+  
+}))
+
+# mean_raw_score column back to numeric
+scores[,c('aa_pos','mean_raw_score')] = apply(scores[,c('aa_pos','mean_raw_score')], 2, as.numeric)
+
+```
+
+## calculate preferences: all positions equally weighted
+Steps:
+  Calculate position-based scaling factor p(r)
+  Multiply raw scores by the position based scaling factor
+
+```{r}
+# define function to get 
+calc_preferences <- function(all_scores, log2_transf = F) {
+  
+  # if log2 scores are passed, convert back to raw score
+  if(log2_transf) { all_scores = 2^all_scores}
+  
+  # calculate the position-based scaling factor
+  ## first, apply max(score, 2e10^-4) to each score
+  all_scores = sapply(all_scores, function(score) {
+    
+    ### if score is less than 2e-4, then make it equal to 2e-4
+    if(score < 2e-4) {score = 2e-4}
+    
+    return(score)
+    })
+
+  ## then, sum all scores and divide by 1 to get the scaling factor
+  all_scores = all_scores * (1 / sum(all_scores))
+  
+  # return the output
+  return(all_scores)
+  
+}
+
+# calculate preferences for each position, then put back together and append to the scores dataframe
+prefs <- bind_rows(lapply(seq(min(scores$aa_pos), max(scores$aa_pos)), function(pos) {
+  
+  ## retrieve the dataframe 
+  scores_pos <- scores[which(scores$aa_pos == pos),]
+  
+  ## apply the calc preferences function to the scores
+  scores_pos$aa_pref = calc_preferences(scores_pos$mean_raw_score)
+  
+  ## check that values add to one
+  if(sum(scores_pos$aa_pref) == 1) { print('Preferences add to 1')}
+  else(print(paste0('ERROR: preferences for position ', pos,' add to ', sum(scores_pos$aa_Pref))))
+  
+  ## return the modified dataframe
+  return(scores_pos)
+  
+}))
+
+write.csv(x = prefs,  file = 'preference_scores_scaled.csv')
+
+prefs$mt_aa = factor(as.factor(prefs$mt_aa), rev(c('H','K','R','D','E','C','M','N','Q','S','T','A','G','I','L','P','V','F','W','Y')))
+ggplot(prefs, aes(x = aa_pos, y = mt_aa, fill = aa_pref)) + geom_tile() + scale_fill_viridis_c()
+
+write.csv(x = scores, file = 'scores_raw.csv')
+
+```
+

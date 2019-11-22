@@ -1,0 +1,2 @@
+# readme file for scRNAseq analysis 
+Cellranger-preprocessed data can be downloaded from GEO at accesssion number [TBD]. Place the preprocessed data into the vcs_paclitaxel/scrnaseq/data/cellranger_outputGEO/ directory before running the code.

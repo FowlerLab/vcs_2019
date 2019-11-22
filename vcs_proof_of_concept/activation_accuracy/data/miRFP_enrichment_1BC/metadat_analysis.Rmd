@@ -1,0 +1,36 @@
+---
+title: "10-30-17_metadat"
+author: "haslen"
+date: "December 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+```
+
+## Analaysis of 10-30-17 metadata (sens, spec, etc.)
+
+```{r}
+
+metdat <- data.frame(read_csv("C:/Users/Nicholas/OneDrive - UW Office 365/PhD/Data/Flow Data/10-30-17_miRFP-enrichment/miRFPenrich_metadat_09-18-17.csv"))
+
+## remove extra dataset (B03_10)
+metdat <- metdat[which(metdat$sample != 'U2OS activated_B03_010'),]
+
+## plot AUC and compare to original AUC (0.993)
+
+ggplot(metdat[which(metdat$activated == TRUE),], aes(x = factor(expected.prop.miRFP), y = AUC_values)) + geom_hline(yintercept = 0.993, color = "blue", linetype = 'dashed') + geom_point(size = 2)
+
+```
+
+Analysis of sensitivity by the same metric
+
+```{r}
+ggplot(metdat[which(metdat$activated == TRUE),], aes(x = spec, y = sens, color = factor(expected.prop.miRFP))) + geom_hline(yintercept = 0.92, color = "blue", linetype = 'dashed') + geom_vline(xintercept = 0.99, color = "blue", linetype = "dashed") + geom_point(size = 2)
+
+```
+
+Analysis of specificity by the same metric
+
+

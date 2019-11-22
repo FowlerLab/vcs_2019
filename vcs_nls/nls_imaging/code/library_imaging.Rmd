@@ -1,0 +1,50 @@
+---
+title: "Library Imaging (Fig 2C)"
+author: "Nick Hasle"
+date: "April 16, 2019"
+output: html_document
+---
+
+
+```{r}
+library(ggplot2)
+library(reshape2)
+
+```
+
+## Figure 2B
+
+```{r}
+data = read.csv('../data/filtered_NLS_library_values.csv')
+
+table(data[,'condition']) # number of cells in each condition
+```
+
+```{r}
+xaxistitle = expression(Log["2"]*('N:C ratio'))
+
+data$condition = factor(data$condition, levels = c('no NLS', 'Wild-type SV40 NLS', 'SV40 NLS library') , ordered = T)
+
+bin_labels = data.frame(xvals = c(-0.15,mean(c(log2(0.964), log2(1.079))), mean(c(log2(1.079), log2(1.244))), 0.4),
+                        labels = c('1','2','3','4'))
+
+ggplot(data, aes(x = nc_ratio, color = condition)) + 
+  geom_density(size = 1, alpha = 0.2, aes(fill = condition)) +
+  geom_text(data = bin_labels, aes(x = xvals, label = labels), y = Inf, color = 'black', vjust = 1, size = 16 * 5 /14) +
+  theme_classic() +
+  theme(axis.text=element_text(size=14), 
+        axis.title=element_text(size=16),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  ylab('Density') +
+  xlab(xaxistitle) +
+  scale_color_manual(values = c('#000000', '#2166ac', '#b2182b')) +
+  scale_fill_manual(values = c('#bababa', '#2166ac', '#b2182b')) +
+  geom_vline(xintercept = c(log2(0.964), log2(1.079), log2(1.244)), linetype = 'dashed', size = 0.5) +
+  xlim(-0.3, 0.75) +
+  guides(color = FALSE, fill = FALSE)
+
+ggsave('F2B.png', dpi = 900, width = 3.25, height = 2.5)
+```
+
+

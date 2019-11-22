@@ -1,0 +1,619 @@
+---
+title: "Activation Accuracy"
+author: "Nick Hasle"
+date: "April 16, 2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(flowCore)
+library(mclust)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(lattice)
+library(DescTools)
+library(reshape2)
+
+## scientific notation
+fancy_scientific <- function(l) {
+     # turn in to character string in scientific notation
+     l <- format(l, scientific = TRUE)
+     # quote the part before the exponent to keep all the digits
+     l <- gsub("^(.*)e", "'\\1'e", l)
+     # turn the 'e+' into plotmath format
+     l <- gsub("e", "%*%10^", l)
+     # return this as an expression
+     parse(text=l)
+}
+
+```
+
+# Functions
+
+## Clean data
+
+Functions like log can cause -Inf values to occur - this function cleans thos up 
+
+## trash gate
+
+removes dead cell pieces from the FSC.SSC plot using simple filters
+
+## Live cell filter
+
+Now, filter dataset by fitting to bivariate normal distribution, picking mean of that distribution, and selecting all cells with the Mahalanobis distance, multiplied by the scale.factor argument.
+
+Note that the relationship between Mahalanobis distance and probability is t = sqrt(-2*ln(1-p)), where t is the threshold mahalanobis disatnce and p is the propability.
+
+So, for p = 0.001, the Mahalanobis distance is 3.72.
+
+Note that the output of this is a filter, which needs to be applied to your dataset of interest, then the dataset of interest needs to be subset based on that filter
+
+## Single cell filter
+
+Now, filter by FSC.A by FSC.W using the same method
+
+## Calculate ratio log(PE) / log(FITC) ratio (for Dendra2 experiments)
+
+Now, calculate a ratio of activated to inactivated Dendra2 for each cell. 
+Can't plot these values with FlowCore, so will just move into regular R dataframes
+
+
+```{r}
+## Clean data
+clean.data <- function(x){
+  column_names <- colnames(x)
+  x.clean <- x
+  for(column in column_names) {
+    x.clean <- x.clean[which(x.clean[,column] != '-Inf'),]
+    x.clean <- x.clean[which(x.clean[,column] != 'NaN'),]
+  }
+  return(x.clean)
+}
+
+## trash gate
+gate_trash = function(x, FSCA_cutoff, SSCA_cutoff) {
+  x.notrash <- x[which(x[,'FSC.A'] > FSCA_cutoff & x[,'SSC.A'] > SSCA_cutoff),]
+  return(x.notrash)
+}
+
+#x.notrash <- gate_trash(x, FSCA_cutoff = 15000, SSCA_cutoff = 15000)
+
+## live cell gate
+
+live.cell.gate = function(dat, p) {
+  # calculate mahalanobis threshold
+  mahalanobis_threshold = sqrt(-2*log(1-p))
+  
+  #set up filter using norm2filter
+  n2f <- norm2Filter(x=c('FSC.A', 'SSC.A'), filterId='livecell',  scale.factor = mahalanobis_threshold)
+  
+  return(n2f)
+}
+
+
+## single cell gate
+
+single.cell.gate = function(dat, p) {
+  # calculate mahalanobis threshold
+  mahalanobis_threshold = sqrt(-2*log(1-p))
+  
+  #set up filter using norm2filter
+  n2f <- norm2Filter(x=c('FSC.A', 'FSC.W'), filterId='singlecell',  scale.factor = mahalanobis_threshold)
+  
+  return(n2f)
+}
+
+## calculate active:unactive Dendra2
+
+calc.ratio.extract.data <- function(x){
+  PE.A.log = log10(x@exprs[,'PE.A'])
+  FITC.A.log = log10(x@exprs[,'FITC.A'])
+  act.unact = PE.A.log/FITC.A.log
+  A700.A.log   = log10(x@exprs[,'Alexa.Fluor.700.A'])
+  new_data = as.data.frame(cbind(x@exprs, PE.A.log, FITC.A.log, A700.A.log, act.unact))
+  new_data = clean.data(new_data)
+  return(new_data)
+}
+
+
+## label a hexbin plot corners with percentages for each gate, use with + in ggplot
+hexbin_cutoff_label <- function(x, xvar, xgate, yvar, ygate) {
+  # generate percentages
+  perc_bottomleft <- round(100*length(x[which(x[,xvar] < xgate & x[,yvar] < ygate), xvar])/length(x[,xvar]),2)
+  perc_bottomright <- round(100*length(x[which(x[,xvar] > xgate & x[,yvar] < ygate), xvar])/length(x[,xvar]),2)
+  perc_topright <- round(100*length(x[which(x[,xvar] > xgate & x[,yvar] > ygate), xvar])/length(x[,xvar]),2)
+  perc_topleft <- round(100*length(x[which(x[,xvar] < xgate & x[,yvar] > ygate), xvar])/length(x[,xvar]),2)
+  # create labels
+  xpos <- c(-Inf,-Inf,Inf,Inf)
+  ypos <- c(-Inf, Inf,-Inf,Inf)
+  annotateText <- c(paste0(perc_bottomleft, '%'),paste0(perc_topleft, '%'),paste0(perc_bottomright, '%'),paste0(perc_topright, '%'))
+  hjustvar<-c(0,0,1,1) 
+  vjustvar<-c(-1,1,-1,1)
+  hexbin_cutoff_labels <- data.frame(xpos, ypos, hjustvar, vjustvar, annotateText)
+  return(geom_text(data=hexbin_cutoff_labels, aes(label=annotateText, x=xpos, y=ypos, hjust = hjustvar, vjust = vjustvar)))
+}
+
+## return a dataframe of values of cutoffs using data and gates
+cutoff_values_2D <- function(x, xvar, xgate, yvar, ygate) {
+  # generate percentages
+  xneg.yneg.count = length(x[which(x[,xvar] < xgate & x[,yvar] < ygate), xvar])
+  xpos.yneg.count <- length(x[which(x[,xvar] > xgate & x[,yvar] < ygate), xvar])
+  xpos.ypos.count <- length(x[which(x[,xvar] > xgate & x[,yvar] > ygate), xvar])
+  xneg.ypos.count <- length(x[which(x[,xvar] < xgate & x[,yvar] > ygate), xvar])
+  total <- length(x[,xvar])
+  # create labels
+  return(c(xneg.yneg.count, xpos.yneg.count, xpos.ypos.count, xneg.ypos.count, total))
+}
+
+## rank all values in the channel, then pick the cutoff closest to the the designated percentile
+cutoff_value_ranked <- function(x, percentile) {
+  sorted <- data.frame(values = sort(x, decreasing = FALSE, na.last = NA))
+  sorted$percentile <- as.integer(row.names(sorted))/length(sorted$values)
+  closest_value = which.min(abs(percentile - sorted$percentile))
+  return(sorted[closest_value, 'values'])
+}
+
+
+# calculate sensitivity and specificity, given a dataframe with A700.A.log and act.unact + gates
+sens.spec <- function(x, A700.gate, actunact.gate) {
+  
+  TP = length(which(x$A700.A.log > A700.gate & x$act.unact > actunact.gate))
+  FP = length(which(x$A700.A.log < A700.gate & x$act.unact > actunact.gate))
+  TN = length(which(x$A700.A.log < A700.gate & x$act.unact < actunact.gate))
+  FN = length(which(x$A700.A.log > A700.gate & x$act.unact < actunact.gate))
+  sensitivity = TP/(TP + FN)
+  specificity = TN/(TN + FP)
+  falsepositiverate = FP / (FP + TN)
+  precision = TP/(TP+FP)
+  return(data.frame(sens = sensitivity, spec = specificity, fpr = falsepositiverate, precision = precision))
+}
+
+##use mixed Gaussian to separate populations into two clusters (used for data for which there is not negative control)
+
+onedim.gate.gausmix <- function(x, channel) {
+  x.clean <- clean.data(x)
+  # kmeans clustering on the desired channel with 2 clusters
+  x.cluster <- Mclust(data.frame (x.clean[,channel]), G=2)
+  # append cluster IDs to the cleaned dataframe
+  x.clean.cluster <- cbind(x.clean, x.cluster$classification)
+  # rename column so it doesn't have a $ sign in it
+  cluster.name = paste0(channel, '.cluster')
+  names(x.clean.cluster)[names(x.clean.cluster) == 'x.cluster$classification'] <- cluster.name
+  # identify "positive" clusters using max function on channel in clean dataframe
+  pos.cluster.id <- x.clean.cluster[which(x.clean.cluster[,channel] == max(x.clean.cluster[,channel])),cluster.name][1]
+  # identify "negative" clusters using min function on channel in clean dataframe
+  neg.cluster.id <- x.clean.cluster[which(x.clean.cluster[,channel] == min(x.clean.cluster[,channel])),cluster.name][1]
+  # calculate mean of max value of neg and min value of pos and then return the cutoff value
+  max.value.neg = max(x.clean.cluster[which(x.clean.cluster[,cluster.name] == neg.cluster.id),channel])
+  min.value.pos = min(x.clean.cluster[which(x.clean.cluster[,cluster.name] == pos.cluster.id),channel])
+  actunact.gate = mean(max.value.neg, min.value.pos)
+
+  return(actunact.gate)
+}
+
+
+```
+
+
+## Figure 1A: Run a control sample through pipeline
+
+```{r}
+# load data
+data_name = '../data/U2OS C11 unactivated_A05_007'
+# look at FSC.A and SSC.A
+cntrl = read.FCS(paste0(data_name, '.fcs'), transformation=FALSE, alter.names=TRUE)
+ggplot(as.data.frame(cntrl@exprs), aes(x=FSC.A, y=SSC.A, z=..density..)) + geom_hex() + scale_fill_distiller(palette = 'Spectral')
+
+## gate out trash
+trash = 25000
+cntrl = read.FCS(paste0(data_name, '.fcs'), transformation=FALSE, alter.names=TRUE)
+ggplot(as.data.frame(cntrl@exprs), aes(x=FSC.A, y=SSC.A, z=..density..)) + geom_hex() + scale_fill_distiller(palette = 'Spectral') + geom_vline(xintercept = trash) + geom_hline(yintercept = trash)
+cntrl.notrash <- gate_trash(cntrl, FSCA_cutoff = trash, SSCA_cutoff = trash)
+
+# generate live cell gate (called live) and check it
+live = live.cell.gate(cntrl.notrash, 0.95)
+# plot live gate
+cntrl.live = Subset(cntrl.notrash, filter(cntrl.notrash, live))
+ggplot(as.data.frame(cntrl.live@exprs), aes(x=FSC.A, y=SSC.A, z=..density..)) + geom_hex() + scale_fill_distiller(palette = 'Spectral') + scale_x_continuous(limits = c(min(cntrl@exprs[,'FSC.A']), max(cntrl@exprs[,'FSC.A']))) + scale_y_continuous(limits = c(min(cntrl@exprs[,'SSC.A']), max(cntrl@exprs[,'SSC.A'])))
+
+# check FSC.A by FSC.W
+ggplot(as.data.frame(cntrl.live@exprs), aes(x=FSC.A, y=FSC.W, z=..density..)) + geom_hex() + scale_fill_distiller(palette = 'Spectral')
+
+# generate single cell gate and check it
+single = single.cell.gate(cntrl.live, 0.999)
+cntrl.live.single = Subset(cntrl.live, filter(cntrl.live, single))
+ggplot(as.data.frame(cntrl.live.single@exprs), aes(x=FSC.A, y=FSC.W, z=..density..)) + geom_hex() + scale_fill_distiller(palette = 'Spectral') + scale_x_continuous(limits = c(min(cntrl.live@exprs[,'FSC.A']), max(cntrl.live@exprs[,'FSC.A']))) + scale_y_continuous(limits = c(min(cntrl.live@exprs[,'FSC.W']), max(cntrl.live@exprs[,'FSC.W'])))
+
+# extract data, calculate PE/FITC ratio
+cntrl.live.single <- clean.data(calc.ratio.extract.data(cntrl.live.single))
+
+# use gaussian mixture model to gate out FITC
+FITC.gate <- onedim.gate.gausmix(cntrl.live.single, 'FITC.A.log')
+cntrl.live.single.FITCpos<-cntrl.live.single[which(cntrl.live.single[,'FITC.A.log'] > FITC.gate),]
+ggplot(cntrl.live.single, aes(x = FITC.A.log)) + geom_histogram(bins = 50) + geom_vline(xintercept = FITC.gate, linetype = 'dashed', size = 1.5)
+
+# plot activated/unactivated dendra2 ratio
+ggplot(cntrl.live.single.FITCpos, aes(x = act.unact)) + geom_histogram(bins = 75)
+
+# use a ranked metric to pick actunact gate (gates out 99% of cells)
+actunact.gate = 0.85
+ggplot(cntrl.live.single.FITCpos, aes(x = act.unact)) + geom_histogram(bins = 50) + geom_vline(xintercept = actunact.gate, linetype = 'dashed', size = 1.5)
+
+# plot miRFP +ve cells
+ggplot(cntrl.live.single.FITCpos, aes(x = A700.A.log)) + geom_histogram(bins = 50) + geom_vline(xintercept = actunact.gate, linetype = 'dashed', size = 1.5)
+
+# set an A700 gate
+A700_gate = 3
+ggplot(cntrl.live.single.FITCpos, aes(x = A700.A.log)) + geom_histogram(bins = 50) + geom_vline(xintercept = A700_gate, linetype = 'dashed', size = 1.5)
+
+
+# plot of miRFP vs. act.unact with labels in place
+ggplot(cntrl.live.single.FITCpos, aes(x=act.unact, y=A700.A.log)) + geom_hex(bins = 50) + scale_fill_distiller(palette = 'Spectral') + hexbin_cutoff_label(cntrl.live.single.FITCpos, 'act.unact', actunact.gate, 'A700.A.log', A700_gate) + geom_hline(yintercept = A700_gate, linetype = 'dashed') + geom_vline(xintercept = actunact.gate, linetype = 'dashed')
+
+
+
+```
+
+
+## Run all data and analyze ROC curves
+
+```{r}
+# plot ROC curves
+
+# collect names of all data in directory and remove .fcs from files
+file_list = list.files(path = '../data/', pattern = '.fcs')
+file_list_nofcs <- unlist(strsplit(file_list, split = '.fcs'))
+
+metadat <- read.csv('metadat.csv')
+
+
+# initialize values of interest
+{i <- 1 # iterate through sample list; initialize iteration at 1
+AUC_values = c()
+prop_miRFPpos = c()
+sens = c()
+spec = c()
+precision = c()
+fpr = c()
+flow_plot_data = list()
+
+flow_plot_data = lapply(file_list, function(file) {
+  # prep plot list
+  plots = list()
+  
+  # convert data name to file
+  data_name = strsplit(file, split = '.fcs')
+  
+  # read data
+  x = read.FCS(paste0('../data/', data_name, '.fcs'), transformation=FALSE, alter.names=TRUE)
+  
+  ## gate out trash
+  x.notrash <- gate_trash(x, FSCA_cutoff = 25000, SSCA_cutoff = 25000)
+  
+  # filter for live cell and plot
+  x.live = Subset(x.notrash, filter(x.notrash, live))
+  
+  # filter for single cell
+  x.single = Subset(x.live, filter(x.live, single))
+  
+  # extract data and calculate PE/FITC ratio
+  x.live.single <- calc.ratio.extract.data(x.single)
+  # remove rows with data at the minimum value for PE.A, FITC.A
+  x.live.single <- x.live.single[which(x.live.single[,'PE.A.log'] != min(x.live.single[,'PE.A.log'])),]
+  x.live.single <- x.live.single[which(x.live.single[,'FITC.A.log'] != min(x.live.single[,'FITC.A.log'])),]
+  
+  # filter for FITC positive cells
+  x.live.single.FITCpos<-x.live.single[which(x.live.single[,'FITC.A.log'] > FITC.gate),]
+  
+  plots[[length(plots) + 1]] = ggplot(x.live.single, aes(x = FITC.A.log)) + geom_histogram(bins = 75) + geom_vline(xintercept = FITC.gate, linetype = 'dashed', size = 1)
+  
+  # calculate the actual % positive miRFP cells
+  prop_miRFPpos[i] <<- length(which(x.live.single.FITCpos$A700.A.log > A700_gate))/length(x.live.single.FITCpos$A700.A.log)
+  
+  # calculate the sensitivity and specificity at baseline
+  sens.spec.data <- sens.spec(x.live.single.FITCpos, A700_gate, actunact.gate)
+  sens[i] <<- sens.spec.data$sens
+  spec[i] <<- sens.spec.data$spec
+  fpr[i] <<- sens.spec.data$fpr
+  precision[i] <<- sens.spec.data$precision
+  
+  # calculate ROC and AUC
+  quants_poscells = quantile(x.live.single.FITCpos[which(x.live.single.FITCpos$act.unact > actunact.gate),]$act.unact, probs = seq(0, 1, 0.01), names = FALSE)
+  quants_poscells = quantile(x.live.single.FITCpos$act.unact, probs = seq(0, 1, 0.01), names = FALSE)
+  quants_poscells = data.frame(seq(0, 1, 0.01), quants_poscells)
+  colnames(quants_poscells) = c('percentile','cutoff')
+  ROCdata <- cbind(quants_poscells, as.data.frame(t(as.data.frame(sapply(quants_poscells$cutoff, sens.spec, x = x.live.single.FITCpos, A700.gate = A700_gate)))))
+  ROCdata$sens = unlist(ROCdata$sens)
+  ROCdata$spec = unlist(ROCdata$spec)
+  ROCdata$precision = unlist(ROCdata$precision)
+  ROCdata$fpr = unlist(ROCdata$fpr)
+  ROCdata <- ROCdata[order(ROCdata$sens),]
+  plots[[length(plots) + 1]] = ggplot(ROCdata, aes(x = (1 - precision), y= sens)) + geom_point() + geom_line()
+  xAUC = 1 - (ROCdata$precision)
+  yAUC = ROCdata$sens
+  AUC_values[i] <<- AUC(xAUC[which(!is.na(xAUC))], yAUC[which(!is.na(xAUC))], method = c("spline"))
+  
+  # plot 2D plot of PE.A vs. FITC
+  plots[[length(plots) + 1]] = ggplot(x.live.single.FITCpos, aes(x=FITC.A.log, y=PE.A.log)) + geom_hex(bins = 50) + scale_fill_distiller(palette = 'Spectral')
+  
+  # plot 1D plot of act.unact
+  plots[[length(plots) + 1]] = ggplot(x.live.single.FITCpos, aes(x = act.unact)) + geom_histogram(bins = 75) + geom_vline(xintercept = actunact.gate, linetype = 'dashed')
+  
+  # plot the 2D hexbin of act.unact vs. A.700.A.log
+  plots[[length(plots) + 1]] = ggplot(x.live.single.FITCpos, aes(x=act.unact, y=A700.A.log)) + geom_hex(bins = 50) + scale_fill_distiller(palette = 'Spectral') + hexbin_cutoff_label(x.live.single.FITCpos, 'act.unact', actunact.gate, 'A700.A.log', A700_gate) + geom_hline(yintercept = A700_gate, linetype = 'dashed') + geom_vline(xintercept = actunact.gate, linetype = 'dashed')
+  
+  # plot the 2D hexbin showing all bins with 1 cell in it as grey
+  plots[[length(plots) + 1]] = ggplot(x.live.single.FITCpos, aes(x=act.unact, y=A700.A.log)) + geom_hex(bins = 50) + scale_fill_distiller(palette = 'Spectral', limits = c(2,350)) + hexbin_cutoff_label(x.live.single.FITCpos, 'act.unact', actunact.gate, 'A700.A.log', A700_gate) + geom_hline(yintercept = A700_gate, linetype = 'dashed') + geom_vline(xintercept = actunact.gate, linetype = 'dashed')
+
+  i <<- i +1
+  
+  # return plotting data
+  flow_plot_data[data_name[[1]]] = x.live.single.FITCpos
+  
+  # return the AUC curve
+  return(x.live.single.FITCpos)
+})
+
+metadat <- cbind(metadat, prop_miRFPpos, AUC_values, spec, sens, fpr, precision)
+
+metadat$expected.prop.miRFP <- as.factor(metadat$expected.prop.miRFP)}
+
+
+```
+
+Generate Figure 1B
+
+```{r}
+library(dplyr)
+actunact.gate = 0.85
+A700_gate = 3
+
+# take two 10% datasets
+datasets = flow_plot_data[which(metadat$sample %in% c('U2OS C11 unactivated_A03_005', 'U2OS activated_C04_018'))]
+
+# merge the datasets together
+datasets[[1]]$label = factor('Activated Culture', levels = c('Unactivated\nControl', 'Activated Culture'))
+datasets[[2]]$label = 'Unactivated\nControl'
+datasets = bind_rows(datasets)
+
+# get the labels for percentages
+datasets$activated = F
+datasets[which(datasets$act.unact > actunact.gate),'activated'] = T
+datasets$miRFPpos = F
+datasets[which(datasets$A700.A.log > A700_gate),'miRFPpos'] = T
+
+# get % positive for each
+print(100*table(datasets[which(datasets$label == 'Unactivated\nControl'),c('miRFPpos','activated')])/sum((datasets$label == 'Unactivated\nControl')))
+
+print(100*table(datasets[which(datasets$label == 'Activated Culture'),c('miRFPpos','activated')])/sum((datasets$label == 'Activated Culture')))
+
+# plot the datasets
+ylablist = expression(Log["10"]*'(miRFP Intensity)')
+xlablist = expression(atop(Log["10"]*'(Activated/Unactivated', 'Dendra2 Intensity)'))
+#ylablist = 'miRFP Intensity'
+datasets$label = factor(datasets$label, levels = c('Activated Culture', 'Unactivated\nControl'), ordered = T)
+
+# get density for psuedocolor plot
+get_density <- function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
+
+datasets$density = get_density(datasets$act.unact, datasets$A700.A.log, n =100)
+
+ggplot(datasets, aes(x = act.unact, y = A700.A.log, color = density)) + 
+  geom_point(size = 0.1, alpha = 0.5) +
+  #geom_hex(bins = 50, color = 'black', size = 0.1) + 
+  scale_fill_distiller(limits = c(2,550)) + 
+  geom_hline(yintercept = A700_gate, color = 'black') + 
+  geom_vline(xintercept = actunact.gate, color = 'black') + 
+  xlab(xlablist) + ylab(ylablist) +
+  xlim(0,1.3) +
+  ylim(-0.5, 5.5) +
+  facet_wrap(~label, ncol = 2, scales = 'free_y') + 
+  guides(color = FALSE) + 
+  theme_classic() +
+  theme(axis.text=element_text(size=12), 
+        axis.title=element_text(size=14), 
+        strip.text.x = element_text(size=14), 
+        strip.background = element_blank()) +
+  scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'))) +
+  guides(color = FALSE)
+  
+ggsave('F1B.png', width = 4.25, height = 3.25, dpi = 900)
+
+```
+
+Generate figure 1C
+
+```{r}
+# calculate average precision
+mean(metadat[which(metadat$activated == T),'precision'])
+mean(metadat[which(metadat$activated == T),'sens'])
+
+to_plot <- melt(metadat[which(metadat$activated),c(1:4,7,9)], id.vars = c('sample', 'activated', 'expected.prop.miRFP', 'prop_miRFPpos'))
+to_plot$expected.prop.miRFP = as.numeric(as.character(to_plot$expected.prop.miRFP))/100
+
+ggplot(to_plot, aes(x = expected.prop.miRFP, 
+                    y = value, 
+                    color = variable)) + 
+  geom_point(alpha = 0.5) + 
+  stat_summary(geom = 'line', 
+               aes(x = expected.prop.miRFP, 
+                   y = value, 
+                   group = variable), 
+               fun.y = mean, size = 1) + 
+  stat_summary(fun.data = 'mean_cl_boot', 
+               aes(x = expected.prop.miRFP, 
+                   y = value, 
+                   group = variable), 
+               size = 0.5) + 
+  theme_classic() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
+                     limits = c(0.5,1)) + 
+  scale_color_manual(values = c('#d7191c', '#2c7bb6')) + 
+  ylab('Value') + 
+  xlab('Proportion miRFP-positive\nCells in Coculture') + 
+  guides(color = FALSE) + 
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14),
+        axis.title.y = element_blank())
+
+ggsave('F1C.png', width = 3.3, height = 3, dpi = 900)
+```
+
+
+## load data for S1A
+
+```{r}
+data = read.csv('../data/Dendra2Decay_S1A/all_data_filtered_annotated.csv')
+
+head(data)
+```
+
+## Plot S1A
+
+```{r}
+ggplot(data[which(data$activation_ms != 0),], aes(x = ratio, color = as.factor(timepoint))) + 
+  geom_density(data = data[which(data$activation_ms == 0),c('ratio', 'doxycycline')], color = 'grey') +
+  geom_density() +
+  geom_classic() +
+  facet_grid(activation_ms~doxycycline) +
+  scale_color_manual(values = rev(c('#fcbba1','#fc9272','#fb6a4a','#de2d26','#a50f15'))) +
+  xlab('Activated / Unactivated Dendra2') +
+  guides(color=guide_legend(title="Time Since Activation (hr)")) +
+  xlim(-8,0.25)
+
+ggsave('Dendra2_Decay_S1A.png', dpi = 900, width = 7.5, height = 4)
+  
+```
+
+## load data for S1B
+
+```{r}
+data = read.csv('../data/405nm-toxicity_S1B/FloJo-analysis/01-26-18_data.csv', stringsAsFactors = F)
+
+data = melt(data[1:18,], id.vars = c('X', 'activation', 'Replicate'))
+
+# remove data for activated cells in negative/positive control (these cells were never activated) and data for unactivated cells in the activated wells (we are interested in the cell death in activated cells only)
+## column for whether cells were activated
+data$activated = sapply(data$variable, function(s) unlist(strsplit(as.character(s), '\\.'))[3])
+## column for subpop
+data$subpop = sapply(data$variable, function(s) unlist(strsplit(as.character(s), '\\.'))[4])
+## remove any cells which dont EITHER have 
+data = data[which(((data$activation %in% c('negative_control', 'positive_control') & (data$activated == 'unactivated_cells')) | ((data$activation %in% c('2h', '8h', '24h', '48h')) & (data$activated == 'activated_cells'))) & (data$subpop %in% c('apop', 'dead', 'necr'))),]
+## make activation ordered factor
+data[which(data$activation == 'negative_control'),'activation'] = 'NegC'
+data[which(data$activation == 'positive_control'),'activation'] = 'PosC'
+data$activation = factor(data$activation, levels = c('NegC', 'PosC', '2h', '8h', '24h', '48h'))
+
+# relabel the apop etc.
+data$subpop <- factor(data$subpop, levels=c("apop", "necr", "dead"), labels=c("Apoptotic", "Necrotic", "Dead"))
+
+head(data)
+```
+
+## plot S1A (gating scheme)
+
+```{r}
+  # read data
+  x = read.FCS('../data/U2OS activated_C04_018.fcs', transformation=FALSE, alter.names=TRUE)
+  x.toplot = as.data.frame(x@exprs)
+  x.toplot$density = get_density(x.toplot$FSC.A, x.toplot$SSC.A, n = 100)
+  x.plt = ggplot(x.toplot, aes(x=FSC.A, y=SSC.A, color = density)) +
+    theme_classic() +
+    geom_point(size = 0.5) +
+    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'))) +
+    geom_vline(xintercept =25000, linetype='dashed') +
+    geom_hline(yintercept =25000, linetype='dashed') +
+    guides(color = F)
+
+  ## gate out trash
+  x.notrash <- gate_trash(x, FSCA_cutoff = 25000, SSCA_cutoff = 25000)
+  x.notrash.toplot = as.data.frame(x.notrash@exprs)
+  x.notrash.toplot$density = get_density(x.notrash.toplot$FSC.A, x.notrash.toplot$SSC.A, n = 100)
+  x.notrash.plt = ggplot(x.notrash.toplot, aes(x=FSC.A, y=SSC.A, color = density)) +
+    theme_classic() +
+    geom_point(size = 0.5) +
+    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'))) +
+    guides(color = F)
+  
+  # filter for live cell and plot
+  x.live = Subset(x.notrash, filter(x.notrash, live))
+  x.live.toplot = as.data.frame(x.live@exprs)
+  x.live.toplot$density = get_density(x.live.toplot$FSC.A, x.live.toplot$SSC.A, n = 100)
+  x.live.plt = ggplot(x.live.toplot, aes(x=FSC.A, y=SSC.A, color = density)) +
+    geom_point(data = x.notrash.toplot, alpha = 0) +
+    theme_classic() +
+    geom_point(size = 0.5) +
+    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58')))+
+    guides(color = F)
+  
+  # filter for single
+  x.live.toplot$density2 = get_density(x.live.toplot$FSC.A, x.live.toplot$FSC.W, n = 100)
+  x.live.plt2 = ggplot(x.live.toplot, aes(x=FSC.A, y=FSC.W, color = density2)) +
+    #geom_point(data = x.notrash.toplot, alpha = 0) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle =45, hjust=1 ))+
+    geom_point(size = 0.5) +
+    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58')))+
+    guides(color = F) + scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
+    scale_x_continuous(labels = function(x) format(x, scientific = TRUE))
+  
+  # filter for single cell
+  x.single = Subset(x.live, filter(x.live, single))
+  x.single.toplot = as.data.frame(x.single@exprs)
+  x.single.toplot$density = get_density(x.single.toplot$FSC.A, x.single.toplot$FSC.W, n = 100)
+  x.single.plt = ggplot(x.single.toplot, aes(x=FSC.A, y=FSC.W, color = density)) +
+    geom_point(data = x.live.toplot, alpha = 0) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle =45, hjust=1 ))+
+    geom_point(size = 0.5) +
+    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58')))+
+    guides(color = F) +
+    scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
+    scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) 
+  
+  # extract data and calculate PE/FITC ratio
+  x.live.single <- calc.ratio.extract.data(x.single)
+  # remove rows with data at the minimum value for PE.A, FITC.A
+  x.live.single <- x.live.single[which(x.live.single[,'PE.A.log'] != min(x.live.single[,'PE.A.log'])),]
+  x.live.single <- x.live.single[which(x.live.single[,'FITC.A.log'] != min(x.live.single[,'FITC.A.log'])),]
+  
+  # show dendra2 filter
+  x.live.singleplt = ggplot(x.live.single, aes(x=FITC.A.log)) +
+    geom_histogram(bins = 100) +
+    theme_classic() +
+    geom_vline(xintercept = FITC.gate, linetype = 'dashed')
+  
+  # filter for FITC positive cells
+  x.live.single.FITCpos<-x.live.single[which(x.live.single[,'FITC.A.log'] > FITC.gate),]
+
+S1A = ggarrange(plotlist = list(x.plt, x.notrash.plt, x.live.plt, x.live.plt2, x.single.plt, x.live.singleplt), ncol = 3, nrow = 2)
+
+ggsave('SF1A.png', S1A, width = 7.5, height = 4.5, dpi = 900)
+```
+
+
+## plot S1C
+
+```{r}
+
+
+ggplot(data, aes(x = activation, y = value/100, color = subpop)) + 
+  geom_point(alpha = 0.3, size = 2) +
+  ylab('Percentage') +
+  xlab('Condition') +
+  guides(color=guide_legend(title="Cell Viability")) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+  
+
+ggsave('S1C.png', dpi = 900, width = 4, height = 2.75)
+```
+

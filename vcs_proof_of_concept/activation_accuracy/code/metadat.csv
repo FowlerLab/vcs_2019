@@ -1,0 +1,25 @@
+sample,activated,expected.prop.miRFP
+U2OS activated_B01_008,TRUE,10
+U2OS activated_B02_009,TRUE,50
+U2OS activated_B03_010,TRUE,0.4
+U2OS activated_B03_011,TRUE,0.4
+U2OS activated_B04_012,TRUE,2
+U2OS activated_B05_013,TRUE,10
+U2OS activated_B06_014,TRUE,50
+U2OS activated_C01_015,TRUE,2
+U2OS activated_C02_016,TRUE,0.4
+U2OS activated_C03_017,TRUE,50
+U2OS activated_C04_018,TRUE,10
+U2OS activated_C05_019,TRUE,2
+U2OS activated_C06_020,TRUE,0.4
+U2OS C11 unactivated_A01_002,FALSE,100
+U2OS C11 unactivated_A02_003,FALSE,100
+U2OS C11 unactivated_A02_004,FALSE,50
+U2OS C11 unactivated_A03_005,FALSE,10
+U2OS C11 unactivated_A04_006,FALSE,2
+U2OS C11 unactivated_A05_007,FALSE,0.4
+U2OS C11 unactivated_D03_021,FALSE,50
+U2OS C11 unactivated_D04_022,FALSE,0.4
+U2OS C11 unactivated_D05_023,FALSE,0.4
+U2OS C11 unactivated_D06_024,FALSE,0
+U2OS gating sample_D02_001,FALSE,50

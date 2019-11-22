@@ -1,0 +1,77 @@
+---
+title: "UVtoxicity-analysis-attempt3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+library(reshape2)
+```
+
+## Objective
+
+Analze UV-toxicity data from 01-26-18 with the following plots in mind:
+  plot global dead, necrotic, live, apoptotic per condition
+
+Plot activated within each well vs. control well dead necrotic, live, apoptotic per condition.
+
+```{r}
+X01_26_18_data <- read.csv("../data/flojo_output.csv")[,1:18]
+
+colnames(X01_26_18_data) <- c('sample', 'all.necr', 'all.dead', 'all.apop', 'all.live', 'perc.act', 'act.necr', 'unact.live', 'unact.apop', 'unact.dead', 'unact.necr', 'perc.unact', 'act.dead', 'act.apop', 'act.live', 'activation.time', 'replicate')
+
+reshaped <- melt(X01_26_18_data, id.vars = c('sample', 'activation.time', 'replicate'))
+
+rename_column <- function(variable){
+  gating <- unlist(strsplit(as.character(variable), '.', fixed = TRUE))[1]
+  subpop <- unlist(strsplit(as.character(variable), '.', fixed = TRUE))[2]
+  return(c(gating, subpop))
+}
+
+new_columns <- t(rbind(sapply(reshaped$variable, rename_column)))
+
+reshaped$gating <- new_columns[,1]
+
+reshaped$subpop <- new_columns[,2]
+
+# need to remove rows that use mean or SD
+reshaped <- reshaped[which(reshaped$replicate != "-"),]
+
+#reorder activation factors
+plot_labels = data.frame(activation.time = c('negative_control', '2h', '8h', '24h', '48h', 'positive_control'),
+                         activation.time.plot = factor(c('Negative C', '2h', '8h', '24h', '48h', 'Positive C'), 
+                                                       levels = c('Negative C', 'Positive C', '2h', '8h', '24h', '48h'),
+                                                       ordered = T))
+
+reshaped <- merge(reshaped, plot_labels, by = 'activation.time')
+
+print(min())
+                         
+
+```
+
+## plot SF1B
+
+```{r}
+ggplot(reshaped[which((reshaped$gating == 'all' & reshaped$activation.time == 'negative_control' |
+                      reshaped$gating == 'all' & reshaped$activation.time == 'positive_control' |
+                      reshaped$gating == 'act' & reshaped$activation.time != 'negative_control' & reshaped$activation.time != 'positive_control') &
+                        reshaped$subpop != 'live'),], 
+       aes(x = activation.time.plot, y = value/100, fill = subpop)) +
+  geom_point(color='black', pch=21, size = 3) +
+  theme_classic() + 
+  scale_y_continuous(labels=scales::percent_format(accuracy = 1)) +
+  xlab('Proportion miRFP-positive\nCells in Coculture') + 
+  guides(fill = guide_legend(title = 'Cell Viability')) + 
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14),
+        axis.title.y = element_blank(),
+        axis.text.x=element_text(angle=45, hjust = 1)) +
+  scale_fill_manual(values = c('#66c2a5','#fc8d62','#8da0cb'))
+
+ggsave('SF1B.png', dpi=600, width=4, height=2.75)
+  
+```
+

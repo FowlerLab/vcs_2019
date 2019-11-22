@@ -1,0 +1,565 @@
+{
+  "conditions": [
+    {
+      "name": "Rep1", 
+      "selections": [
+        {
+          "libraries": [
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T1_0MS_S7_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T1_0ms", 
+              "report filtered reads": false, 
+              "timepoint": 0, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T1_50MS_S8_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T1_50ms", 
+              "report filtered reads": false, 
+              "timepoint": 1, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T1_200MS_S9_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T1_200ms", 
+              "report filtered reads": false, 
+              "timepoint": 2, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T1_800MS_S10_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T1_800ms", 
+              "report filtered reads": false, 
+              "timepoint": 3, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }
+          ], 
+          "name": "Rep1Tech1"
+        }, 
+        {
+          "libraries": [
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T2_0MS_S15_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T2_0ms", 
+              "report filtered reads": false, 
+              "timepoint": 0, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T2_50MS_S16_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T2_50ms", 
+              "report filtered reads": false, 
+              "timepoint": 1, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T2_200MS_S17_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T2_200ms", 
+              "report filtered reads": false, 
+              "timepoint": 2, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R1T2_800MS_S18_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R1T2_800ms", 
+              "report filtered reads": false, 
+              "timepoint": 3, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }
+          ], 
+          "name": "Rep1Tech2"
+        }
+      ]
+    }, 
+    {
+      "name": "Rep2", 
+      "selections": [
+        {
+          "libraries": [
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T1_0MS_S11_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T1_0ms", 
+              "report filtered reads": false, 
+              "timepoint": 0, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T1_50MS_S12_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T1_50ms", 
+              "report filtered reads": false, 
+              "timepoint": 1, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T1_200MS_S13_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T1_200ms", 
+              "report filtered reads": false, 
+              "timepoint": 2, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T1_800MS_S14_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T1_800ms", 
+              "report filtered reads": false, 
+              "timepoint": 3, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }
+          ], 
+          "name": "Rep2Tech1"
+        }, 
+        {
+          "libraries": [
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T2_0MS_S19_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T2_0ms", 
+              "report filtered reads": false, 
+              "timepoint": 0, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T2_50MS_S20_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T2_50ms", 
+              "report filtered reads": false, 
+              "timepoint": 1, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T2_200MS_S21_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T2_200ms", 
+              "report filtered reads": false, 
+              "timepoint": 2, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T2_800MS_S22_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T2_800ms", 
+              "report filtered reads": false, 
+              "timepoint": 3, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }
+          ], 
+          "name": "Rep2Tech2"
+        }, 
+        {
+          "libraries": [
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T3_0MS_S23_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T3_0ms", 
+              "report filtered reads": false, 
+              "timepoint": 0, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T3_50MS_S24_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T3_50ms", 
+              "report filtered reads": false, 
+              "timepoint": 1, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T3_200MS_S25_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T3_200ms", 
+              "report filtered reads": false, 
+              "timepoint": 2, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/R2T3_800MS_S26_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "R2T3_800ms", 
+              "report filtered reads": false, 
+              "timepoint": 3, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }
+          ], 
+          "name": "Rep2Tech3"
+        }
+      ]
+    }, 
+    {
+      "name": "input_1", 
+      "selections": [
+        {
+          "libraries": [
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/NLS_input_1short_a_S1_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "input1_short_a", 
+              "report filtered reads": false, 
+              "timepoint": 0, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/NLS_input_1long_a_S3_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "input_long_a", 
+              "report filtered reads": false, 
+              "timepoint": 1, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }
+          ], 
+          "name": "input1"
+        }
+      ]
+    }, 
+    {
+      "name": "input_2", 
+      "selections": [
+        {
+          "libraries": [
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/NLS_input_2a_S5_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "input_2_a", 
+              "report filtered reads": false, 
+              "timepoint": 0, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }, 
+            {
+              "fastq": {
+                "filters": {
+                  "min quality": 20
+                }, 
+                "length": 33, 
+                "reads": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/raw_data/NLS_input_2b_S6_pear.fastq.assembled.fastq.gz", 
+                "reverse": false
+              }, 
+              "name": "input_2_b", 
+              "report filtered reads": false, 
+              "timepoint": 1, 
+              "variants": {
+                "use aligner": false, 
+                "wild type": {
+                  "coding": true, 
+                  "reference offset": 0, 
+                  "sequence": "GAGGCTCCTAAAAAGAAGAGAAAGGTAGGTATC"
+                }
+              }
+            }
+          ], 
+          "name": "input_2"
+        }
+      ]
+    }
+  ], 
+  "name": "DMS_NLS_Rep1Rep2", 
+  "output directory": "C:/Users/admin/OneDrive - UW/PhD/Data/Illumina/NLS_Rep1Rep2_02-2018/enrich2_output"
+}

@@ -1,0 +1,52 @@
+---
+title: "Mutant Validation Fig3C / SF3C"
+author: "Nick Hasle"
+date: "May 7 2019"
+output: html_document
+---
+
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+```
+
+load data for Figure 4A
+
+```{r}
+data_4a = read.csv('../data/taxol-prelim_8_10-18-18_clean.LOG', stringsAsFactors = F)
+colnames(data_4a) = c("Image Name", "Image Plane", "Image Date and Time", "Elapsed Time", "Region Name", "Object #", "Total area", "Pixel area", "Average intensity", "Total intensity", "Minimum intensity", "Maximum intensity", "Perimeter", "Shape factor", "Ell. form factor")
+data_4a$well = sapply(data_4a$`Image Name`, function(s) unlist(strsplit(s, '_'))[[3]])
+
+data_4a = data_4a[which(data_4a$well %in% c('A01', 'A02')),]
+
+data_4a$treatment = 'DMSO'
+data_4a[which(data_4a$well == 'A01'),'treatment'] = 'Taxol'
+
+table(data_4a$treatment)
+
+```
+
+Plot Figure 4A
+
+```{r}
+ggplot(data_4a, 
+       aes(x = `Shape factor`, color = treatment)) +
+  geom_density(size = 1, aes(fill = treatment), alpha = 0.25) +
+  theme_classic() +
+  theme(axis.text=element_text(size=12), 
+        axis.title=element_text(size=14),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  scale_color_manual(values = c('#000000', '#b2182b')) +
+  scale_fill_manual(values = c('#bababa', '#b2182b')) +
+  ylab('Density') +
+  xlab('Shape factor') +
+  geom_vline(xintercept = 0.65, linetype = 'dashed') +
+  guides(color = FALSE, fill = FALSE) 
+
+ggsave('F4A.png', dpi = 900, width = 2.5, height = 2)
+  
+```
+

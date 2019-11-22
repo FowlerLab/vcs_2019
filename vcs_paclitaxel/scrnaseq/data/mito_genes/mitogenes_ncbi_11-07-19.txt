@@ -1,0 +1,111 @@
+tax_id	Org_name	GeneID	CurrentID	Status	Symbol	Aliases	description	other_designations	map_location	chromosome	genomic_nucleotide_accession.version	start_position_on_the_genomic_accession	end_position_on_the_genomic_accession	orientation	exon_count	OMIM	
+63221	Homo sapiens neanderthalensis	6775087	0	live	12S rRNA		12S ribosomal RNA			MT	NC_011137.1	644	1597	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923213	0	live	12S rRNA		s-rRNA			MT	NC_013993.1	645	1598	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923219	0	live	16S rRNA		l-rRNA			MT	NC_013993.1	1668	3225	plus	0		
+9606	Homo sapiens	4508	0	live	MT-ATP6	ATPase6, MTATP6, ATP6	mitochondrially encoded ATP synthase 6			MT	NC_012920.1	8527	9207	plus	0		
+63221	Homo sapiens neanderthalensis	6775074	0	live	ATP6		ATP synthase F0 subunit 6	; ATP synthase F0 subunit 6		MT	NC_011137.1	8522	9202	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923188	0	live	ATP6		ATP synthase F0 subunit 6	; ATP synthase F0 subunit 6		MT	NC_013993.1	8529	9209	plus	0		
+9606	Homo sapiens	4509	0	live	MT-ATP8	ATPase8, MTATP8, ATP8	mitochondrially encoded ATP synthase 8			MT	NC_012920.1	8366	8572	plus	0		
+63221	Homo sapiens neanderthalensis	6775077	0	live	ATP8		ATP synthase F0 subunit 8	; ATP synthase F0 subunit 8		MT	NC_011137.1	8361	8567	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923211	0	live	ATP8		ATP synthase F0 subunit 8	; ATP synthase F0 subunit 8		MT	NC_013993.1	8368	8574	plus	0		
+9606	Homo sapiens	4512	0	live	MT-CO1	COI, MTCO1, COX1	mitochondrially encoded cytochrome c oxidase I			MT	NC_012920.1	5904	7445	plus	0		
+63221	Homo sapiens neanderthalensis	6775083	0	live	COX1		cytochrome c oxidase subunit I	; cytochrome c oxidase subunit I		MT	NC_011137.1	5899	7440	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923218	0	live	COX1		cytochrome c oxidase subunit I	; cytochrome c oxidase subunit I		MT	NC_013993.1	5906	7447	plus	0		
+63221	Homo sapiens neanderthalensis	6775079	0	live	COX2		cytochrome c oxidase subunit II	; cytochrome c oxidase subunit II		MT	NC_011137.1	7581	8264	plus	0		
+9606	Homo sapiens	4513	0	live	MT-CO2	COII, MTCO2, COX2	mitochondrially encoded cytochrome c oxidase II			MT	NC_012920.1	7586	8269	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923202	0	live	COX2		cytochrome c oxidase subunit II	; cytochrome c oxidase subunit II		MT	NC_013993.1	7588	8271	plus	0		
+9606	Homo sapiens	4514	0	live	MT-CO3	COIII, MTCO3, COX3	mitochondrially encoded cytochrome c oxidase III	; cytochrome c oxidase III|cytochrome c oxidase subunit III		MT	NC_012920.1	9207	9990	plus	0		
+63221	Homo sapiens neanderthalensis	6775073	0	live	COX3		cytochrome c oxidase subunit III	; cytochrome c oxidase subunit III		MT	NC_011137.1	9202	9985	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923187	0	live	COX3		cytochrome c oxidase subunit III	; cytochrome c oxidase subunit III		MT	NC_013993.1	9209	9992	plus	0		
+9606	Homo sapiens	4519	0	live	MT-CYB	MTCYB, CYTB	mitochondrially encoded cytochrome b			MT	NC_012920.1	14747	15887	plus	0		
+63221	Homo sapiens neanderthalensis	6775065	0	live	CYTB		cytochrome b	; cytochrome b		MT	NC_011137.1	14742	15882	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923205	0	live	CYTB		cytochrome b	; cytochrome b		MT	NC_013993.1	14749	15889	plus	0		
+9606	Homo sapiens	4535	0	live	MT-ND1	MTND1, ND1	mitochondrially encoded NADH dehydrogenase 1	; NADH dehydrogenase, subunit 1 (complex I)|NADH dehydrogenase subunit 1		MT	NC_012920.1	3307	4262	plus	0		
+63221	Homo sapiens neanderthalensis	6775098	0	live	ND1		NADH dehydrogenase subunit 1	; NADH dehydrogenase subunit 1		MT	NC_011137.1	3308	4258	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923209	0	live	ND1		NADH dehydrogenase subunit 1	; NADH dehydrogenase subunit 1		MT	NC_013993.1	3303	4258	plus	0		
+9606	Homo sapiens	4536	0	live	MT-ND2	MTND2, ND2	mitochondrially encoded NADH dehydrogenase 2	; MTND2|NADH dehydrogenase subunit 2		MT	NC_012920.1	4470	5511	plus	0		
+63221	Homo sapiens neanderthalensis	6775094	0	live	ND2		NADH dehydrogenase subunit 2	; NADH dehydrogenase subunit 2		MT	NC_011137.1	4465	5506	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923212	0	live	ND2		NADH dehydrogenase subunit 2	; NADH dehydrogenase subunit 2		MT	NC_013993.1	4466	5507	plus	0		
+9606	Homo sapiens	4537	0	live	MT-ND3	MTND3, ND3	mitochondrially encoded NADH dehydrogenase 3	; NADH dehydrogenase, subunit 3 (complex I)|NADH dehydrogenase subunit 3		MT	NC_012920.1	10059	10404	plus	0		
+63221	Homo sapiens neanderthalensis	6775076	0	live	ND3		NADH dehydrogenase subunit 3	; NADH dehydrogenase subunit 3		MT	NC_011137.1	10054	10399	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923206	0	live	ND3		NADH dehydrogenase subunit 3	; NADH dehydrogenase subunit 3		MT	NC_013993.1	10061	10406	plus	0		
+9606	Homo sapiens	4538	0	live	MT-ND4	MTND4, ND4	mitochondrially encoded NADH dehydrogenase 4	; NADH dehydrogenase, subunit 4 (complex I)|NADH dehydrogenase subunit 4		MT	NC_012920.1	10760	12137	plus	0		
+63221	Homo sapiens neanderthalensis	6775072	0	live	ND4		NADH dehydrogenase subunit 4	; NADH dehydrogenase subunit 4		MT	NC_011137.1	10755	12132	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923197	0	live	ND4		NADH dehydrogenase subunit 4	; NADH dehydrogenase subunit 4		MT	NC_013993.1	10762	12139	plus	0		
+9606	Homo sapiens	4539	0	live	MT-ND4L	MTND4L, ND4L	mitochondrially encoded NADH 4L dehydrogenase	; NADH dehydrogenase, subunit 4L (complex I)|NADH dehydrogenase subunit 4L		MT	NC_012920.1	10470	10766	plus	0		
+63221	Homo sapiens neanderthalensis	6775071	0	live	ND4L		NADH dehydrogenase subunit 4L	; NADH dehydrogenase subunit 4L		MT	NC_011137.1	10465	10761	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923201	0	live	ND4L		NADH dehydrogenase subunit 4L	; NADH dehydrogenase subunit 4L		MT	NC_013993.1	10472	10768	plus	0		
+9606	Homo sapiens	4540	0	live	MT-ND5	MTND5, ND5	mitochondrially encoded NADH dehydrogenase 5	; NADH dehydrogenase, subunit 5 (complex I)|NADH dehydrogenase subunit 5		MT	NC_012920.1	12337	14148	plus	0		
+63221	Homo sapiens neanderthalensis	6775066	0	live	ND5		NADH dehydrogenase subunit 5	; NADH dehydrogenase subunit 5		MT	NC_011137.1	12332	14143	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923210	0	live	ND5		NADH dehydrogenase subunit 5	; NADH dehydrogenase subunit 5		MT	NC_013993.1	12339	14150	plus	0		
+9606	Homo sapiens	4541	0	live	MT-ND6	MTND6, ND6	mitochondrially encoded NADH dehydrogenase 6	; NADH dehydrogenase, subunit 6 (complex I)|NADH dehydrogenase subunit 6		MT	NC_012920.1	14149	14673	minus	0		
+63221	Homo sapiens neanderthalensis	6775063	0	live	ND6		NADH dehydrogenase subunit 6	; NADH dehydrogenase subunit 6		MT	NC_011137.1	14144	14668	minus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923198	0	live	ND6		NADH dehydrogenase subunit 6	; NADH dehydrogenase subunit 6		MT	NC_013993.1	14151	14675	minus	0		
+9606	Homo sapiens	4549	0	live	MT-RNR1	MTRNR1, RNR1	mitochondrially encoded 12S RNA			MT	NC_012920.1	648	1601	plus	0		
+9606	Homo sapiens	4550	0	live	MT-RNR2	MTRNR2, RNR2	mitochondrially encoded 16S RNA			MT	NC_012920.1	1671	3229	plus	0		
+63221	Homo sapiens neanderthalensis	6775085	0	live	rrn16		16S ribosomal RNA			MT	NC_011137.1	1667	3224	plus	0		
+9606	Homo sapiens	4553	0	live	MT-TA	MTTA, TRNA	mitochondrially encoded tRNA alanine			MT	NC_012920.1	5587	5655	minus	0		
+63221	Homo sapiens neanderthalensis	6775093	0	live	trnA		tRNA			MT	NC_011137.1	5582	5650	minus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923217	0	live	trnA		tRNA			MT	NC_013993.1	5583	5651	minus	0		
+9606	Homo sapiens	4511	0	live	MT-TC	MTTC, TRNC	mitochondrially encoded tRNA cysteine			MT	NC_012920.1	5761	5826	minus	0		
+63221	Homo sapiens neanderthalensis	6775084	0	live	trnC		tRNA			MT	NC_011137.1	5755	5821	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923200	0	live	trnC		tRNA			MT	NC_013993.1	5757	5824	minus	0		
+9606	Homo sapiens	4555	0	live	MT-TD	MTTD, TRND	mitochondrially encoded tRNA aspartic acid			MT	NC_012920.1	7518	7585	plus	0		
+63221	Homo sapiens neanderthalensis	6775081	0	live	trnD		tRNA			MT	NC_011137.1	7513	7580	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923215	0	live	trnD		tRNA			MT	NC_013993.1	7520	7587	plus	0		
+9606	Homo sapiens	4556	0	live	MT-TE	MTTE, TRNE	mitochondrially encoded tRNA glutamic acid			MT	NC_012920.1	14674	14742	minus	0		
+63221	Homo sapiens neanderthalensis	6775064	0	live	trnE		tRNA			MT	NC_011137.1	14669	14737	minus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923199	0	live	trnE		tRNA			MT	NC_013993.1	14676	14744	minus	0		
+9606	Homo sapiens	4558	0	live	MT-TF	TRNF	mitochondrially encoded tRNA phenylalanine			MT	NC_012920.1	577	647	plus	0		
+63221	Homo sapiens neanderthalensis	6775088	0	live	trnF		tRNA			MT	NC_011137.1	573	643	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923184	0	live	trnF		tRNA			MT	NC_013993.1	574	644	plus	0		
+9606	Homo sapiens	4563	0	live	MT-TG	MTTG, TRNG	mitochondrially encoded tRNA glycine			MT	NC_012920.1	9991	10058	plus	0		
+63221	Homo sapiens neanderthalensis	6775075	0	live	trnG		tRNA			MT	NC_011137.1	9986	10053	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923191	0	live	trnG		tRNA			MT	NC_013993.1	9993	10060	plus	0		
+9606	Homo sapiens	4564	0	live	MT-TH	MTTH, TRNH	mitochondrially encoded tRNA histidine			MT	NC_012920.1	12138	12206	plus	0		
+63221	Homo sapiens neanderthalensis	6775069	0	live	trnH		tRNA			MT	NC_011137.1	12133	12201	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923196	0	live	trnH		tRNA			MT	NC_013993.1	12140	12208	plus	0		
+9606	Homo sapiens	4565	0	live	MT-TI	MTTI, TRNI	mitochondrially encoded tRNA isoleucine			MT	NC_012920.1	4263	4331	plus	0		
+63221	Homo sapiens neanderthalensis	6775097	0	live	trnI		tRNA			MT	NC_011137.1	4258	4326	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923193	0	live	trnI		tRNA			MT	NC_013993.1	4259	4327	plus	0		
+9606	Homo sapiens	4566	0	live	MT-TK	MTTK, TRNK	mitochondrially encoded tRNA lysine			MT	NC_012920.1	8295	8364	plus	0		
+63221	Homo sapiens neanderthalensis	6775078	0	live	trnK		tRNA			MT	NC_011137.1	8290	8359	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923190	0	live	trnK		tRNA			MT	NC_013993.1	8297	8366	plus	0		
+63221	Homo sapiens neanderthalensis	6775067	0	live	trnL		tRNA			MT	NC_011137.1	12261	12331	plus	0		
+63221	Homo sapiens neanderthalensis	6775086	0	live	trnL		tRNA			MT	NC_011137.1	3225	3299	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923214	0	live	trnL		tRNA			MT	NC_013993.1	12268	12338	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923186	0	live	trnL		tRNA			MT	NC_013993.1	3226	3300	plus	0		
+9606	Homo sapiens	4567	0	live	MT-TL1	MTTL1, TRNL1	mitochondrially encoded tRNA leucine 1 (UUA/G)			MT	NC_012920.1	3230	3304	plus	0		
+9606	Homo sapiens	4568	0	live	MT-TL2	MTTL2, TRNL2	mitochondrially encoded tRNA leucine 2 (CUN)			MT	NC_012920.1	12266	12336	plus	0		
+9606	Homo sapiens	4569	0	live	MT-TM	MTTM, TRNM	mitochondrially encoded tRNA methionine			MT	NC_012920.1	4402	4469	plus	0		
+63221	Homo sapiens neanderthalensis	6775096	0	live	trnM		tRNA			MT	NC_011137.1	4397	4464	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923204	0	live	trnM		tRNA			MT	NC_013993.1	4398	4465	plus	0		
+9606	Homo sapiens	4570	0	live	MT-TN	MTTN, TRNN	mitochondrially encoded tRNA asparagine			MT	NC_012920.1	5657	5729	minus	0		
+63221	Homo sapiens neanderthalensis	6775091	0	live	trnN		tRNA			MT	NC_011137.1	5652	5724	minus	0		
+9606	Homo sapiens	4571	0	live	MT-TP	MTTP, TRNP	mitochondrially encoded tRNA proline			MT	NC_012920.1	15956	16023	minus	0		
+63221	Homo sapiens neanderthalensis	6775089	0	live	trnP		tRNA			MT	NC_011137.1	15950	16018	minus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923216	0	live	trnP		tRNA			MT	NC_013993.1	15958	16025	minus	0		
+9606	Homo sapiens	4572	0	live	MT-TQ	MTTQ, TRNQ	mitochondrially encoded tRNA glutamine			MT	NC_012920.1	4329	4400	minus	0		
+63221	Homo sapiens neanderthalensis	6775095	0	live	trnQ		tRNA			MT	NC_011137.1	4324	4395	minus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923208	0	live	trnQ		tRNA			MT	NC_013993.1	4325	4396	minus	0		
+9606	Homo sapiens	4573	0	live	MT-TR	MTTR, TRNR	mitochondrially encoded tRNA arginine			MT	NC_012920.1	10405	10469	plus	0		
+63221	Homo sapiens neanderthalensis	6775070	0	live	trnR		tRNA			MT	NC_011137.1	10400	10464	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923195	0	live	trnR		tRNA			MT	NC_013993.1	10407	10471	plus	0		
+63221	Homo sapiens neanderthalensis	6775080	0	live	trnS		tRNA			MT	NC_011137.1	7440	7511	minus	0		
+63221	Homo sapiens neanderthalensis	6775068	0	live	trnS		tRNA			MT	NC_011137.1	12202	12260	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923207	0	live	trnS		tRNA			MT	NC_013993.1	12209	12267	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923189	0	live	trnS		tRNA			MT	NC_013993.1	7448	7516	minus	0		
+9606	Homo sapiens	4574	0	live	MT-TS1	MTTS1, TRNS1	mitochondrially encoded tRNA serine 1 (UCN)			MT	NC_012920.1	7446	7514	minus	0		
+9606	Homo sapiens	4575	0	live	MT-TS2	MTTS2, TRNS2	mitochondrially encoded tRNA serine 2 (AGU/C)			MT	NC_012920.1	12207	12265	plus	0		
+9606	Homo sapiens	4576	0	live	MT-TT	MTTT, TRNT	mitochondrially encoded tRNA threonine			MT	NC_012920.1	15888	15953	plus	0		
+63221	Homo sapiens neanderthalensis	6775062	0	live	trnT		tRNA			MT	NC_011137.1	15883	15948	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923192	0	live	trnT		tRNA			MT	NC_013993.1	15890	15955	plus	0		
+9606	Homo sapiens	4577	0	live	MT-TV	MTTV, TRNV	mitochondrially encoded tRNA valine			MT	NC_012920.1	1602	1670	plus	0		
+63221	Homo sapiens neanderthalensis	6775090	0	live	trnV		tRNA			MT	NC_011137.1	1598	1666	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923185	0	live	trnV		tRNA			MT	NC_013993.1	1599	1667	plus	0		
+9606	Homo sapiens	4578	0	live	MT-TW	MTTW, TRNW	mitochondrially encoded tRNA tryptophan			MT	NC_012920.1	5512	5579	plus	0		
+63221	Homo sapiens neanderthalensis	6775092	0	live	trnW		tRNA			MT	NC_011137.1	5507	5574	plus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923194	0	live	trnW		tRNA			MT	NC_013993.1	5508	5576	plus	0		
+9606	Homo sapiens	4579	0	live	MT-TY	MTTY, TRNY	mitochondrially encoded tRNA tyrosine			MT	NC_012920.1	5826	5891	minus	0		
+63221	Homo sapiens neanderthalensis	6775082	0	live	trnY		tRNA			MT	NC_011137.1	5821	5886	minus	0		
+741158	Homo sapiens subsp. 'Denisova'	8923203	0	live	trnY		tRNA			MT	NC_013993.1	5822	5887	minus	0		

@@ -1,0 +1,11 @@
+# remove large files that are not needed or that are kept in the GEO depository
+vcs_proof_of_concept/activation_bulk_RNAseq/*
+bin/monocle3/tests/testdata/cr2.0/outs/filtered_gene_bc_matrices/hg19/matrix.mtx
+vcs_paclitaxel/scrnaseq/data/cellranger_outputGEO/*
+vcs_nls/nls_scores/data/*
+*.RData
+
+# keep readme files
+!vcs_proof_of_concept/activation_bulk_RNAseq/README.txt
+!vcs_paclitaxel/scrnaseq/data/cellranger_outputGEO/README.txt
+!vcs_nls/nls_scores/data/README.txt

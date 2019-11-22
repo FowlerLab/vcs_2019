@@ -1,0 +1,947 @@
+---
+title: "Analysis VCS Taxol Experiments 1/2"
+output: html_notebook
+---
+
+# OVERVIWEW
+## Experiment
+Here, we analyze the data from two experiments of RPE-1 cells treated with DMSO or taxol for 30h and then activated according to their nuclear shape phenotype over 12 hours. In experiment 1, cells were sorted according to their activation state i.e. nuclear shape phenotype. In experiment 2, cells with normal and lobulated nuclear shapes were sorted into the same tube, for the purposes of batch correction.
+
+## Analysis strategy
+1. Use Seurat to annotate cell cycle scores and create Monocle cds object, preprocess
+2. Find highly-variable genes in experiment 2 (no suspected batch effect)
+3. Use MNN batch correction (Batchelor) on the highly-variable genes to batch correct samples in experiment 1
+4. Examine MNN batch correction output for principle components that separate cells according to nuclear shape phenotype
+5. Generate a composite "nuclear shape score" using the principle components
+6. Using the original data from Experiment 2, perform a DEG test on the "nuclear shape score", including batch and cell cycle as covariates
+7. Perform a gene-set enrichment analysis on the DEG results
+8. Examine specific genes associated with gene sets of interest: TUBB4B (tubulin), STMN1 (tubulin depolymerizer), PSMC4 (proteasome component), CCT5 (chaperone for tubulin), EIF4A1 (c-Myc pathway activity marker), ENO1 (mTOR pathway activity marker), FN1 (fibronectin), ITGB5 (fibronectin receptor component)
+8. Make a heatmap of genes in specific gene sets according to cells binned by their lobulation scores
+
+# LOAD PACKAGES
+
+```{r}
+library(devtools)
+
+library(Matrix)
+library(spdep)
+library(SummarizedExperiment)
+library(SingleCellExperiment)
+load_all('../../../bin/monocle3/')
+library(monocle3)
+
+#BiocManager::install('BiocSingular')
+load_all('../../../bin/batchelor/')
+library(batchelor)
+
+library(Seurat)
+library(monocle)
+library(scran)
+
+library(scRNAseq)
+library(SingleCellExperiment)
+library(scater)
+library(ggpubr)
+
+library(AUC)
+library(piano)
+library(slam)
+library(MASS)
+library(dplyr)
+
+source('GSA_hyper_helper_functions.R')
+source('loadGSCSafe.R')
+source('seurat_functions.R')
+
+set.seed(9)
+```
+
+# Get session info
+
+```{r}
+sessionInfo()
+```
+
+
+# FUNCTIONS
+## Seurat cell cycle analysis
+Arguments: matrix file location; feature data; phenotypic data
+Output: phenotypic dataframe + cell cycle scores, cell cycle designations
+
+Based on https://satijalab.org/seurat/v3.0/cell_cycle_vignette.html
+
+```{r}
+
+seurat_cellcycle <- function(mat_file, pd, fd){
+
+  # Read in the expression matrix The first row is a header row, the first column is rownames
+  exp.mat <- readMM(file = mat_file)
+  row.names(exp.mat) = fd$gene_short_name
+  colnames(exp.mat) = pd$cell
+
+  # A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
+  # segregate this list into markers of G2/M phase and markers of S phase
+  s.genes <- cc.genes$s.genes
+  g2m.genes <- cc.genes$g2m.genes
+
+  # Create our Seurat object and complete the initalization steps
+  marrow <- CreateSeuratObject(counts = exp.mat)
+  marrow <- NormalizeData(marrow)
+  marrow <- FindVariableFeatures(marrow, selection.method = "vst")
+  marrow <- ScaleData(marrow, features = rownames(marrow))
+  marrow <- RunPCA(marrow, features = VariableFeatures(marrow), ndims.print = 6:10, nfeatures.print = 10)
+  marrow <- CellCycleScoring(marrow, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+  # merg seurat cell cycle object with the phenodata frame
+  orig_order    <- pd$cell # save the original order of cells
+  pd            <- merge(pd, marrow[[]][,c('S.Score', 'G2M.Score', 'Phase')], by.x = 'cell', by.y = 'row.names') # add cell cycle info
+  pd$sample     <- sapply(pd$cell, function(x) unlist(strsplit(as.character(x), '-'))[[2]])
+  row.names(pd) <- pd$cell
+  pd            <- pd[match(orig_order, row.names(pd)),]
+
+  return(pd)
+
+  }
+
+```
+
+## preprocess cds
+Inputs: matrix file location; feature data; phenotypic data
+Output: cds with seurat cell cycle annotations, processed with reduced_dimensions to plot UMAP
+
+```{r}
+preprocess_seurat <- function(mat_file, pd, fd, annotate_seurat = TRUE){
+
+  # add_seurat
+  if(annotate_seurat) {
+    print('Annotating with Seurat cell cycle analysis..')
+    pd <- seurat_cellcycle(mat_file, pd, fd)}
+
+  # load rep1 data
+  print('Creating cds..')
+  cds <- new_cell_data_set(readMM(mat_file),
+                                cell_metadata = pd,
+                                gene_metadata = fd)
+
+  # preprocess
+  print('Preprocessing cds..')
+  cds  <- preprocess_cds(cds, num_dim = 100)
+
+  # remove outlier cells
+  print('Removing outlier cells..')
+  low_size_factor_val <- mean(colData(cds)$Size_Factor) - (2*sd(colData(cds)$Size_Factor))
+  hi_size_factor_val <- mean(colData(cds)$Size_Factor) + (2*sd(colData(cds)$Size_Factor))
+  cds <- cds[,which(cds$Size_Factor > low_size_factor_val & cds$Size_Factor < hi_size_factor_val )]
+
+  # remove genes detected < 10 times
+  gene_total_umis <- rowSums(exprs(cds))
+  to_keep         <- names(gene_total_umis)[which(gene_total_umis > 9)]
+  cds             <- cds[to_keep,]
+
+  # plot
+  print('Preparing UMAP..')
+  cds = reduce_dimension(cds, reduction_method = 'UMAP', umap.n_neighbors = 30)
+
+  return(cds)}
+
+```
+
+
+# 1. PREPROCESS DATA AND USE SEURAT TO GENERATE CELL CYCLE SCORES
+## Experiment 1
+sample 3 = taxol, normal-appearing (200ms)
+sample 4 = taxol, lobulated (800ms)
+```{r}
+# prep phenodata
+pd1            <- data.frame(cell = read.csv('../data/cellranger_outputGEO/barcodes_exp1.tsv', sep = '\t', header = F),
+                 stringsAsFactors = F)
+colnames(pd1)  <- 'cell'
+
+# prep featuredata
+fd1            <- as.data.frame(read.csv('../data/cellranger_outputGEO/features_exp1.tsv', sep = '\t', header = F),
+                    stringsAsFactors = F)[,c(1,2)]
+colnames(fd1)  <- c('id', 'gene_short_name')
+row.names(fd1) <- fd1$id
+
+# reannotate phenodata with Seurat
+cds_exp1      <- preprocess_seurat(mat_file = '../data/cellranger_outputGEO/matrix_exp1.mtx',
+                                  pd = pd1,
+                                  fd = fd1)
+
+
+# retrieve median UMIs per cell
+median(colSums(exprs(cds_exp1)))
+
+# annotate cells with phenotype
+colData(cds_exp1)$pheno = factor('Normal', levels = c('Normal', 'Lobulated', 'Mixed'))
+colData(cds_exp1)[which(colData(cds_exp1)$sample == 4 ),'pheno'] = as.factor('Lobulated')
+
+# plot
+plot_cells(cds_exp1, color_cells_by = 'pheno', label_cell_groups = F) + scale_color_manual(values = c('#91bfdb', '#fc8d59')) +
+  theme_classic() +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(color=guide_legend(title='Phenotype', override.aes = list(size=5))) # note potential batch effect in taxol treated cells
+
+```
+
+### check cell cycle distributions
+
+```{r}
+cell_cycle_counts = table(colData(cds_exp1)[which(colData(cds_exp1)$sample %in% c(3,4)),c('pheno','Phase')])
+totals = apply(cell_cycle_counts, 1, sum)
+cell_cycle_counts = as.data.frame(t(cell_cycle_counts))
+cell_cycle_counts$perc = apply(cell_cycle_counts, 1, function(x) as.numeric(x['Freq']) / totals[x['pheno']])
+
+cell_cycle_counts$pheno = factor(cell_cycle_counts$pheno, levels = c('Normal', 'Lobulated'))
+
+print(cell_cycle_counts)
+
+# plot cell cycle distribution
+ggplot(cell_cycle_counts[which(cell_cycle_counts$pheno %in% c('Normal', 'Lobulated')),], aes(x = pheno, y = perc, fill = Phase)) + geom_bar(stat = 'identity') +
+  theme_classic() +
+  theme(axis.text=element_text(size=12),
+        axis.text.x = element_text(angle = 45, hjust=1),
+        axis.title=element_text(size=14),
+        legend.position  = 'none') +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+        xlab('Phenotype') +
+        ylab(NULL)
+
+```
+
+## Experiment 2
+
+```{r}
+# prep phenodata
+pd2            <- data.frame(cell = read.csv('../data/cellranger_outputGEO/barcodes_exp2.tsv', sep = '\t', header = F),
+                 stringsAsFactors = F)
+colnames(pd2)  <- 'cell'
+
+# prep featuredata
+fd2            <- as.data.frame(read.csv('../data/cellranger_outputGEO/features_exp2.tsv', sep = '\t', header = F),
+                    stringsAsFactors = F)
+colnames(fd2)  <- c('id', 'gene_short_name')
+row.names(fd2) <- fd2$id
+
+# annotate phenodata with Seurat
+cds_exp2      <- preprocess_seurat(mat_file = '../data/cellranger_outputGEO/matrix_exp2.mtx',
+                                  pd = pd2,
+                                  fd = fd2)
+
+# annotate cells with phenotype
+colData(cds_exp2)$pheno = factor('Mixed', levels = c('Normal', 'Lobulated', 'Mixed'))
+
+# retrieve median UMIs per cell
+median(colSums(exprs(cds_exp2)))
+
+plot_cells(cds_exp2, color_cells_by = 'sample') # note a single population - batch effect from before was real
+
+```
+
+
+# 2. FIND GENES TO USE IN MNN BATCH CORRECTION
+Going to use genes expressed in over 500 cells across all 3 paclitaxel-treated samples in the two experiments
+
+```{r}
+# calculate the number of cells expressing each gene within each batch
+n_cells_expressed_exp1_normal <- apply(exprs(cds_exp1[,which(colData(cds_exp1)$sample == 3)]), 1, function(x) sum(x > 0))
+n_cells_expressed_exp1_lobulated <- apply(exprs(cds_exp1[,which(colData(cds_exp1)$sample == 4)]), 1, function(x) sum(x > 0))
+n_cells_expressed_exp2_mixed <- apply(exprs(cds_exp2), 1, function(x) sum(x > 0))
+
+# pick genes that are expressed in > 500 cells in each batch
+chosen = Reduce(intersect, list(names(n_cells_expressed_exp1_normal[which(n_cells_expressed_exp1_normal > 500)]),
+                                names(n_cells_expressed_exp1_lobulated[which(n_cells_expressed_exp1_lobulated > 500)]),
+                                names(n_cells_expressed_exp2_mixed[which(n_cells_expressed_exp2_mixed > 500)]))) # choose highly variable genes that are also detected in Experiment 1
+ggplot(as.data.frame(n_cells_expressed_exp1_normal), aes(x = n_cells_expressed_exp1_normal)) + geom_histogram(bins = 500)
+
+```
+
+
+
+# 3. PERFORM MNN BATCH CORRECTION
+
+```{r}
+# batch correct sample 3 onto sample 2, then 4 onto each otherm
+mnn_exp1.exp2_taxol <- batchelor::fastMNN(monocle3::normalize_expr_data(cds_exp2[chosen,which(colData(cds_exp2)$sample == 2)],
+                                                                  norm_method = 'log', pseudo_count = 1),
+                                          monocle3::normalize_expr_data(cds_exp1[chosen,which(colData(cds_exp1)$sample == 3)],
+                                                                  norm_method = 'log', pseudo_count = 1),
+                                          monocle3::normalize_expr_data(cds_exp1[chosen,which(colData(cds_exp1)$sample == 4)],
+                                                                  norm_method = 'log', pseudo_count = 1),
+                                          d=50,
+                                          k=20)
+
+# remake the cds for taxol but annotate with the new principle components
+cds_exp1.mnn_taxol = cds_exp1[,which(colData(cds_exp1)$sample %in% c(3,4))] # remake taxol cds
+cds_exp1.mnn_taxol = cds_exp1.mnn_taxol[, # reorder original cds to match mnn batch correction
+                                        match(colnames(mnn_exp1.exp2_taxol)[which(mnn_exp1.exp2_taxol$batch %in% c(2,3))],
+                                                                            colnames(cds_exp1.mnn_taxol))]
+# replace PCA with mnn batch corrected PCA
+reducedDim(cds_exp1.mnn_taxol, 'PCA') <- reducedDim(mnn_exp1.exp2_taxol)[which(mnn_exp1.exp2_taxol$batch %in% c(2,3)),]
+
+# remake UMAP with batch correction PCs
+cds_exp1.mnn_taxol = reduce_dimension(cds_exp1.mnn_taxol, reduction_method = 'UMAP', umap.n_neighbors = 30)    
+
+# add phenotype information
+colData(cds_exp1.mnn_taxol)$pheno = factor('Normal', levels = c('Normal', 'Lobulated'))
+colData(cds_exp1.mnn_taxol)[which(colData(cds_exp1.mnn_taxol)$sample == 4 ),'pheno'] = as.factor('Lobulated')
+
+plot_cells(cds_exp1.mnn_taxol, color_cells_by = 'pheno', label_cell_groups = F) + scale_color_manual(values = c('#91bfdb', '#fc8d59')) +
+  theme_classic() +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(color=guide_legend(title='Phenotype', override.aes = list(size=5))) 
+```
+
+
+
+```{r}
+# plot new UMAP
+cds_exp1.mnn_taxol = reduce_dimension(cds_exp1.mnn_taxol, reduction_method = 'UMAP', umap.n_neighbors = 30)
+
+
+plot_cells(cds_exp1.mnn_taxol, color_cells_by = 'Phase', label_cell_groups = F, cell_size = 0.1) +
+  facet_wrap(~pheno, ncol = 2, scales = 'free_y') +
+  #geom_density_2d(color = 'black', alpha = 0.5) +
+  xlim(-6.75, 7.5) +
+  ylim(-4, 4.5) +
+  #geom_vline(xintercept = 0, linetype = 'dashed') +
+  #geom_hline(yintercept = 0, linetype = 'dashed') +
+  geom_text(aes(label = pheno),
+                x = -Inf,
+                y = Inf,
+                size = 5,
+                hjust = -0.1,
+                vjust = 1,
+            data = data.frame(pheno = c('Normal', 'Lobulated'),
+                             val = c(1,2))) +
+  theme_classic() +
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14),
+        strip.text.x = element_blank(),
+        strip.background = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        panel.grid.major = element_line(size = 0.5,
+                                        linetype = 'solid',
+                                        colour = "grey"),
+        panel.grid.minor = element_line(size = 0,
+                                        linetype = 'solid',
+                                        colour = "white"),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 12),
+        legend.position ='bottom',
+        plot.margin=unit(c(0.1,0.1,-0.1,0.1),"in")) +
+  guides(color=guide_legend(title='Cell Cycle Phase', override.aes = list(size=5)))
+
+ggsave('F4D.png', dpi = 900, width = 4.5, height = 2.75)
+
+
+```
+
+# 4. EXAMINE MNN BATCH CORRECTION OUTPUT FOR PCs THAT SEPARATE CELLS BY VCS LOBULATION BIN
+
+Look at first 6 PCs
+
+Look at first 6 PCs in both experiment 1 and experiment 2
+
+```{r}
+# add principle components to colData
+pca_rep1.mnn            <- base::cbind(data.frame(colData(cds_exp1.mnn_taxol)), data.frame(cds_exp1.mnn_taxol@reducedDims$PCA))
+colnames(pca_rep1.mnn)  <- c('cell','S.Score','G2M.Score','Phase','sample','Size_Factor', 'pheno',
+                             sapply(seq(1,50), function(x) paste0('PC', x)))
+
+pca_rep1.mnn$experiment = 'Experiment 1 - VCS'
+
+cols <- c('experiment', 'Phase', 'pheno', 'PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6')
+to_plot = pca_rep1.mnn[,c(cols)]
+to_plot = melt(to_plot, id.vars = cols[1:3])
+
+# plot first 6 principle components. Demonstrates PCs 1-4 best distinguish between normal and low shape factor cells
+ggplot(to_plot, aes(x = Phase, y = value, fill = pheno)) +
+    geom_boxplot() +
+    guides(color = FALSE) +
+  theme_classic() +
+    theme(axis.text=element_text(size=12),
+          axis.title=element_text(size=14),
+          strip.text.x = element_text(size = 16),
+          strip.background = element_blank(),
+          axis.ticks.y=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.title.y = element_blank(),
+          legend.title = element_text(size = 14),
+          legend.text = element_text(size = 12),
+          legend.position="bottom") +
+    xlab('Cell cycle phase') +
+  facet_wrap(~variable, scales = 'free', ncol = 2) +
+  scale_fill_manual(name = 'Phenotype', values = c('#91bfdb', '#fc8d59'))
+
+ggsave('SF4C.png', width = 3.75, height = 5, dpi = 900)
+
+
+```
+
+# 5. GENERATE COMPOSITE LOBULATION SCORE USING THE PRINCIPLE COMPONENTS
+### Check classification accuracy for PC1 vs. a composite score generated with a logistic regression that uses PCs 1-4 as predictor variables
+```{r}
+library(AUC)
+# use PC1 alone
+accs <- roc(predictions = pca_rep1.mnn$PC1,
+                 labels = as.factor(pca_rep1.mnn$sample == 3))
+
+plot(x = accs$fpr, y = accs$tpr) # it's ok.
+print(auc(accs))
+
+# use first 4 PCs
+nuclear_shape_score = glm(formula = as.factor(sample) ~ PC1 + PC2 + PC3 + PC4,
+                      data = data.frame(pca_rep1.mnn),
+                      family = 'binomial'(link = 'logit'))
+
+accs <- roc(predictions = nuclear_shape_score$fitted.values,
+                 labels = as.factor(pca_rep1.mnn$sample == 4))
+print(auc(accs))
+
+plot(x = accs$fpr, y = accs$tpr) # pretty good! Let's try using this instead.
+```
+
+## check that the lobulation score does a good job of separating lobulated and normal-appearing cells
+
+```{r}
+if(all(names(nuclear_shape_score$fitted.values) == colnames(cds_exp1.mnn_taxol))) { # ensure names are in the same order
+  colData(cds_exp1.mnn_taxol)$shape_score = nuclear_shape_score$linear.predictors} # use linear.predictor variable so that you don't get weird regression results
+
+# add the score to the dataframe
+
+
+ggplot(data.frame(colData(cds_exp1.mnn_taxol)), aes(x = shape_score, fill = sample)) + geom_histogram() + theme_classic()
+
+```
+
+## visualize UMAP with the lobulation_score
+
+```{r}
+plot_cells(cds_exp1.mnn_taxol, color_cells_by = 'shape_score') +
+   theme_classic() +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(color=guide_legend(title='Lobulation\nScore', override.aes = list(size = 5)))
+
+```
+
+
+## Apply the lobulation score to the unseparated paclitaxel-treated replicate
+
+```{r}
+# remake the cds for taxol, replicate 2 but use the new principle components
+cds_exp2.mnn_taxol = cds_exp2[,which(colData(cds_exp2)$sample == 2)]
+
+# reorder cds to match mnn batch correction
+cds_exp2.mnn_taxol = cds_exp2.mnn_taxol[,match(colnames(mnn_exp1.exp2_taxol)[which(mnn_exp1.exp2_taxol$batch == 1)],
+                                               colnames(cds_exp2.mnn_taxol))]
+
+# replace PCA with mnn batch corrected PCA
+reducedDim(cds_exp2.mnn_taxol, 'PCA') <- reducedDim(mnn_exp1.exp2_taxol)[which(mnn_exp1.exp2_taxol$batch == 1),]
+
+# remake UMAP
+cds_exp2.mnn_taxol = reduce_dimension(cds_exp2.mnn_taxol, reduction_method = 'UMAP', umap.n_neighbors = 30)
+
+# apply the model to this sample
+pca_rep2.mnn            <- base::cbind(data.frame(colData(cds_exp2.mnn_taxol)), data.frame(cds_exp2.mnn_taxol@reducedDims$PCA))
+
+colnames(pca_rep2.mnn)  <- c('cell','S.Score','G2M.Score','Phase','sample','Size_Factor', 'pheno',
+                             sapply(seq(1,50), function(x) paste0('PC', x)))
+pca_rep2.mnn$shape_score <- predict(nuclear_shape_score, pca_rep2.mnn)
+
+# annotate the colData with shape_score
+colData(cds_exp2.mnn_taxol) = cbind(colData(cds_exp2.mnn_taxol), pca_rep2.mnn[,'shape_score'])
+colnames(colData(cds_exp2.mnn_taxol)) = c('cell', 'S.Score', 'G2M.Score', 'Phase', 'sample', 'Size_Factor', 'pheno', 'shape_score')
+
+ggarrange(plotlist = list(
+  plot_cells(cds_exp2.mnn_taxol, color_cells_by = 'shape_score') +
+   theme_classic() +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(color=guide_legend(title='Lobulation\nScore', override.aes = list(size = 5))),
+  
+  plot_cells(cds_exp2.mnn_taxol, color_cells_by = 'Phase') +
+   theme_classic() +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  guides(color=guide_legend(title='Lobulation\nScore', override.aes = list(size = 5)))
+))
+
+```
+
+## Compare Lobulation scores across each replicate
+
+```{r}
+# include data from replicate 1 as a comparison
+merged_scores <- rbind(pca_rep2.mnn[,c('cell', 'shape_score', 'pheno')], data.frame(colData(cds_exp1.mnn_taxol))[,c('cell','shape_score', 'pheno')])
+merged_scores$Exp = c(rep('Experiment 2', nrow(pca_rep2.mnn)), rep('Experiment 1', nrow(colData(cds_exp1.mnn_taxol))))
+
+ggplot(merged_scores) +
+  geom_histogram(aes(x = shape_score, fill = pheno),
+                 bins = 40, color = 'black', size = 0.5) +
+  facet_wrap(~Exp, ncol = 1, scales = 'free_y') + xlim(-7.5, 10) +
+  theme_classic() +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.position = c(0, 1), 
+        legend.justification = c(-0.005, 1)) +
+  xlim(-12, 10) +
+  guides(fill=guide_legend(title='Phenotype')) +
+  scale_fill_manual(values = c('#91bfdb', '#fc8d59', '#ffffbf')) +
+  xlab('Lobulation Score') +
+  ylab('Count')
+
+ggsave('SF4D.png', dpi = 900, width = 4.5, height = 5)
+
+```
+
+# 6. USING THE ORIGINAL DATA FROM EXPERIMENT 2, PERFORM A DEG TEST ON THE LOBULATION SCORE, INCLUDING CELL CYCLE AS A COVARIATE
+We include cell cycle as we know that it also varies with the principle components used to make the lobulation score (see PC plots above); and because cell cycle explains a lot of the gene expression variance 
+
+
+```{r}
+degs_taxol_shape_exp2 <- fit_models(cds_exp2.mnn_taxol,
+                               model_formula_str = '~shape_score + S.Score + G2M.Score')
+
+# derive beta coefficients
+coeffs_taxol_shape_exp2 <- coefficient_table(degs_taxol_shape_exp2)
+coeffs_taxol_shape_exp2 <- as.data.frame(coeffs_taxol_shape_exp2)
+#write.csv(coeffs_taxol_shape_exp2, 'degs_taxol_shape_exp2.csv')
+
+# plot volcano plot
+ggplot(coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score'),], aes(x = normalized_effect)) + geom_histogram(bins = 100) + geom_vline(xintercept = -0.1, linetype='dashed') + geom_vline(xintercept = 0.1, linetype ='dashed')
+
+coeffs_taxol_shape_exp2$significant_deg = abs(coeffs_taxol_shape_exp2$normalized_effect) > 0.1 & coeffs_taxol_shape_exp2$q_value < 0.01
+coeffs_taxol_shape_exp2$hvg = coeffs_taxol_shape_exp2$id %in% chosen
+print(sum(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score')) # number of genes significantly associated with lobulation score
+print(sum(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score' & coeffs_taxol_shape_exp2$normalized_effect < 0) / sum(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score')) # number of genes that have higher expression in normal cells
+
+write.csv(coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score'),], 'ST5.csv')
+
+ggplot(coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score'),], aes(x = normalized_effect, y = -log10(q_value), color = significant_deg)) +
+  geom_point(size = 1) +
+  theme_classic() +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  xlab('Log2(Effect Size)') +
+  ylab('-Log10(q value)') +
+  scale_color_manual(values = c('#bababa', '#ca0020')) +
+  guides(color=FALSE)
+
+ggsave('SF4E.png', width = 2.75, height = 2.5, dpi = 900)
+
+```
+
+# 7. PERFORM A GENE SET ENRICHMENT ANALYSIS ON THE DEG RESULTS
+Downregulated (negative effect size) genes are more highly expressed in normal cells. 
+Upregulated (positive effect size) genes are more highly expressed in lobulated cells. 
+
+```{r}
+coeffs_taxol_shape_exp2[order(coeffs_taxol_shape_exp2$q_value),]
+upreg_degs = coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score' &
+                                           coeffs_taxol_shape_exp2$significant_deg &
+                                           coeffs_taxol_shape_exp2$normalized_effect > 0),'gene_short_name']
+downreg_degs = coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score' &
+                                           coeffs_taxol_shape_exp2$significant_deg &
+                                           coeffs_taxol_shape_exp2$normalized_effect < 0),'gene_short_name']
+
+gsea_analysis <- function(degs, universe, geneset_file){
+  gsc_hallmarks = loadGSCSafe(file = geneset_file) # load geneset
+  gsc_result = piano::runGSAhyper(genes = degs, # perform gsea
+                   universe = as.character(unique(universe)),
+                   gsc = gsc_hallmarks)
+  output = as.data.frame(gsc_result$resTab)
+  output$sig_genest_in_geneset <- sapply(row.names(output), function(x) {
+    all_genes = unlist(gsc_result$gsc[x][[1]])
+    return(paste0(intersect(degs, all_genes), collapse = ', '))
+  })
+
+  return(output)
+}
+
+# the universe are any genes tested by the deg test
+universe = unique(coeffs_taxol_shape_exp2$gene_short_name)
+
+# look at upreg degs in the two genesets:
+hallmarks_upreg <- gsea_analysis(upreg_degs,
+                                 universe,
+                                 '../data/genesets/h.all.v6.2.symbols.gmt')
+canonpaths_upreg <- gsea_analysis(upreg_degs, 
+                                  universe,
+                                  '../data/genesets/c2.cp.v7.0.symbols.gmt')                                  
+
+# look at downreg degs in the two genesets
+hallmarks_downreg <- gsea_analysis(downreg_degs,
+                                   universe,
+                                   '../data/genesets/h.all.v6.2.symbols.gmt'); hallmarks_downreg = hallmarks_downreg[which(hallmarks_downreg$`Adjusted p-value` < 0.01),] ; write.csv(hallmarks_downreg[order(hallmarks_downreg$`Adjusted p-value`),],
+                                                                                         'ST7.csv')  
+canonpaths_downreg <- gsea_analysis(downreg_degs,
+                              universe,
+                              '../data/genesets/c2.cp.v7.0.symbols.gmt'); canonpaths_downreg = canonpaths_downreg[which(canonpaths_downreg$`Adjusted p-value` < 0.01),] ; canonpaths_downreg$prop_genes = canonpaths_downreg$`Significant (in gene set)`/(canonpaths_downreg$`Non-significant (in gene set)`+canonpaths_downreg$`Significant (in gene set)`) ; write.csv(canonpaths_downreg[order(canonpaths_downreg$prop_genes, decreasing = T),],
+                                                                                         'ST6.csv')  
+
+```
+
+# 8. EXAMINE SPECIFIC GENES OF INTEREST
+
+## Look at genes according to lobulation score in the unseparated experiment (2)
+```{r}
+GOIs = c('TUBB4B',
+         'CLU',
+         'HSPA5',
+         'STMN1',
+         'CCT5')
+
+
+get_gene_df <- function(cds, ids = NULL, genes = NULL, corr = T) {
+
+  # if gene names given, retrieve ids
+  if(!is.null(genes)) { ids = rowData(cds)[which(rowData(cds)$gene_short_name %in% genes),'id'] }
+  ids = as.character(ids)
+
+  # correct values for size factor and bind to cell data
+  gene_expr       <- exprs(cds[ids,])
+  if(corr) {corr_gene_expr  <-  as.data.frame(apply(gene_expr, 1, function(x) x / colData(cds)$Size_Factor))} else {corr_gene_expr = t(gene_expr)}
+  colnames(corr_gene_expr) <- rowData(cds)[ids,'gene_short_name']
+  output = cbind(colData(cds), corr_gene_expr)
+
+  # return the output
+  return(as.data.frame(output))
+}
+
+
+
+# look at some select genes
+df_chosen_genes <- get_gene_df(cds_exp2.mnn_taxol, genes = GOIs, corr = F)
+
+
+# reshape to long format
+df_chosen_genes_long <- melt(df_chosen_genes, id.vars = c('cell', 'S.Score', 'G2M.Score', 'Phase', 'sample', 'Size_Factor', 'shape_score', 'pheno'))
+
+df_chosen_genes_long$value = as.numeric(df_chosen_genes_long$value)
+df_chosen_genes_long$gene = factor(as.factor(df_chosen_genes_long$variable),
+                               levels = GOIs,
+                               ordered = T)
+
+# create an annotation df with log2(ES) and qvalue
+annotation_df = as.data.frame(coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score' &
+                                              coeffs_taxol_shape_exp2$gene_short_name %in% GOIs),
+                                        c('gene_short_name', 'q_value', 'normalized_effect')])
+annotation_df$variable = annotation_df$gene_short_name
+annotation_df$gene = factor(as.factor(annotation_df$variable),
+                               levels = GOIs,
+                               ordered = T)
+annotation_df$annotation = paste0('q val: ',
+         format(unlist(annotation_df['q_value']), format='e', digits = 2),
+         '\nlog2(ES): ',
+         format(unlist(annotation_df['normalized_effect']), digits = 2))
+
+# plot
+ggplot(df_chosen_genes_long) +
+#ggplot(df_chosen_genes_long[which(df_chosen_genes_long$Phase == 'G2M'),]) +
+  geom_jitter(size = 1, alpha = 0.2, aes(x = shape_score, y = value, color = Phase)) +
+  facet_wrap(~gene, scales = 'free', ncol = 3) +
+  theme_classic() +
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=16),
+        strip.text.x = element_text(size=16),
+        strip.background = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  geom_text(data = annotation_df, x= Inf, y = Inf, hjust = 1, vjust = 1, aes(label = annotation)) +
+  guides(fill=guide_legend(title='Phenotype')) +
+  ylab('Gene Count') +
+  xlab('Lobulation Score') +
+  scale_fill_manual(values = c('#91bfdb', '#fc8d59')) +
+  geom_smooth(method="glm.nb",formula=y~x, aes(x = shape_score, y = value, color = Phase))
+
+ggsave('SF4F.png', dpi = 900, width = 6, height = 3.5)
+
+```
+
+## Get DEG values for genes of interest
+
+```{r}
+# Microtubule genes
+## Source: REACTOME R-HSA-5610524; REACTOME R-HSA-5610525, plus stathmin
+tubulin_genes = c('TUBA1C', 'TUBA1B', 'TUBA4A', 'TUBA1A', 'TUBA3C', 'TUBA3D', 'TUBB3', 'TUBB4A', 'TUBB4B', 'TUBB2A', 'TUBB1', 'TUBB2B', 'TUBB6', 'STMN1')
+tubulin_df <- coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$gene_short_name %in% tubulin_genes & coeffs_taxol_shape_exp2$term == 'shape_score'),]
+tubulin_df$group = 'tubulin-related'
+
+# Chaperones
+## Source: REACTOME R-HSA-390455; 
+TRiC_genes = c('TCP1', 'CCT2', 'CCT3', 'CCT4', 'CCT5', 'CCT6A', 'CCT6B', 'TRAP1', 'CCT7', 'CCT8', # TRiC
+               'CLU', 'HSPA5', # Clusterin
+               'HSP90AA1', 'HSP90AB1', 'HSP90B1', 'HSP90AA2') # HSP90
+tric_df <- coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$gene_short_name %in% TRiC_genes & coeffs_taxol_shape_exp2$term == 'shape_score'),]
+tric_df$group = 'chaperones'
+
+all_GOI_df = rbind(tubulin_df, tric_df)
+
+# make a color scale
+max_abs_val = max(abs(all_GOI_df$normalized_effect))
+pallette = colorRampPalette(c('#b2182b','#d6604d','#f4a582','#fddbc7','#f7f7f7','#d1e5f0','#92c5de','#4393c3','#2166ac'))
+pallette = data.frame(val = seq(from = -max_abs_val,
+                                to = max_abs_val,
+                                length.out = 50),
+                      color = pallette(50))
+
+# apply the color scale to the dataset
+all_GOI_df$color = sapply(all_GOI_df$normalized_effect, function(x) {
+  return(pallette[which(abs(x - pallette$val) == min(abs(x - pallette$val))),'color'])
+})
+
+print(sapply(c(-0.2, -.15,-.1,-.5, 0), function(x) {
+  return(pallette[which(abs(x - pallette$val) == min(abs(x - pallette$val))),'color'])
+}))
+
+write.csv(all_GOI_df, 'F4E_colors.csv')
+
+```
+
+
+# 9. Make heatmaps of significantly differentially expressed pathway genes
+
+## Function to make a heatmap
+
+```{r}
+# make a dataframe with genes and hallmarks according to shape score
+make_pheatmap <- function(cds,
+                          gene_set,
+                          deg_df,
+                          approx_group_size = 500,
+                          exclude_insig_genes = T,
+                          for_png = F) {
+  
+  # get ids
+  ids = unlist(sapply(gene_set, function(x) {
+    as.character(rowData(cds)[which(rowData(cds)$gene_short_name == x),'id'])
+    }))
+  
+  # group cells by shape score
+  cell_group_df <- tibble::tibble(cell = row.names(colData(cds)),
+                                  cell_group = cut(x = colData(cds)$shape_score,
+                                                  round(ncol(cds)/approx_group_size)))
+
+  # make matrix
+  agg_mat <- aggregate_gene_expression(cds[ids,],
+                                        cell_group_df =  cell_group_df,
+                                        norm_method = 'log')
+  
+  # rescale the matrix
+  rescaled_agg_mat <- t(apply(agg_mat, 1, scale)); colnames(rescaled_agg_mat) = colnames(agg_mat)
+  
+  # make column annotations
+  anncol <- bind_rows(lapply(levels(cell_group_df$cell_group), function(x) {
+    data.frame(median_shapescore = median(colData(cds)[which(cell_group_df$cell_group == x),'shape_score']))
+  })) ; row.names(anncol) <- levels(cell_group_df$cell_group)
+    
+  # make row annotations
+  annrow <- deg_df[which(deg_df$id %in% ids),c('id','normalized_effect','q_value','significant_deg', 'gene_short_name')]
+  annrow <- annrow[which(annrow$significant_deg),]
+
+  # reorder the matrix in the same way as the annotation rows
+  annrow <- annrow[order(-1*as.numeric(annrow$significant_deg), annrow$normalized_effect),] # order row annotations
+  rescaled_agg_mat<-rescaled_agg_mat[match(annrow$id, row.names(rescaled_agg_mat)),]
+  
+  # make the heatmap
+  if(for_png){
+  pheatmap::pheatmap(rescaled_agg_mat,  
+                   color = RColorBrewer::brewer.pal(9, 'Reds'),
+                   breaks = seq(-2,2, length.out = 9),
+                   cluster_rows = FALSE,
+                   cluster_cols = FALSE,
+                   fontsize = 24,
+                   #annotation_row = data.frame(normalized_effect = annrow$normalized_effect,
+                                               #row.names = annrow$id),
+                   annotation_col = anncol,
+                   labels_row= annrow$gene_short_name,
+                   cuttree_rows = 2,
+                   annotation_colors = list(normalized_effect = rev(RColorBrewer::brewer.pal(9, 'Reds'))[1:5],
+                                            median_shapescore = RColorBrewer::brewer.pal(9, 'Greys')))} else {
+                                              
+  pheatmap::pheatmap(rescaled_agg_mat,  
+                   color = RColorBrewer::brewer.pal(9, 'Reds'),
+                   breaks = seq(-2,2, length.out = 9),
+                   cluster_rows = FALSE,
+                   cluster_cols = FALSE,
+                   #annotation_row = data.frame(normalized_effect = annrow$normalized_effect,
+                                               #row.names = annrow$id),
+                   annotation_col = anncol,
+                   labels_row= annrow$gene_short_name,
+                   cuttree_rows = 2,
+                   annotation_colors = list(normalized_effect = rev(RColorBrewer::brewer.pal(9, 'Reds'))[1:5],
+                                            median_shapescore = RColorBrewer::brewer.pal(9, 'Greys')))
+                                            }
+}
+
+save_pheatmap <- function(x, filename, width=900, height=1800) {
+   stopifnot(!missing(x))
+   stopifnot(!missing(filename))
+   png(filename,width = width, height=height)
+   grid::grid.newpage()
+   grid::grid.draw(x$gtable)
+   dev.off()
+}
+
+```
+
+## make heatmaps for c-Myc, mTOR pathways
+
+### c-Myc geneset 
+
+```{r}
+# load geneset
+hallmarks = loadGSCSafe('../data/genesets/h.all.v6.2.symbols.gmt')
+canonpaths = loadGSCSafe('../data/genesets/c2.cp.v7.0.symbols.gmt')
+
+## Make Myc Heatmap
+ph <- make_pheatmap(cds = cds_exp2.mnn_taxol,
+              gene_set = as.character(unlist(hallmarks$gsc$HALLMARK_MYC_TARGETS_V1)),
+              deg_df = coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score'),],
+              approx_group_size = 400,
+              exclude_insig_genes = T,for_png = T
+              )
+
+save_pheatmap(ph,
+              width = 900,
+              height = 2050,
+              'F4F_Left.png')
+
+```
+
+### mTOR geneset
+
+```{r}
+## Make mTOR Heatmap
+ph <- make_pheatmap(cds = cds_exp2.mnn_taxol,
+              gene_set = as.character(unlist(hallmarks$gsc$HALLMARK_MTORC1_SIGNALING)),
+              deg_df = coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score'),],
+              approx_group_size = 400,
+              exclude_insig_genes = T,
+              for_png = T
+              )
+
+save_pheatmap(ph,
+              width = 900,
+              height = 1710,
+              'F4F_Right.png')
+```
+
+### cMyc geneset #2
+
+```{r}
+
+
+## Make other Myc targets (doesn't overlap with mTOR as much)
+ph <- make_pheatmap(cds = cds_exp2.mnn_taxol,
+              gene_set = as.character(unlist(hallmarks$gsc$HALLMARK_MYC_TARGETS_V2)),
+              deg_df = coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score'),],
+              approx_group_size = 400,
+              exclude_insig_genes = T,
+              for_png = F)
+
+ph
+
+```
+
+## Finally, proteins involved in the TRiC complex
+
+```{r}
+
+ph <- make_pheatmap(cds = cds_exp2.mnn_taxol,
+              gene_set = as.character(unlist(canonpaths$gsc$REACTOME_FOLDING_OF_ACTIN_BY_CCT_TRIC)),
+              deg_df = coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score'),],
+              approx_group_size = 400,
+              exclude_insig_genes = T)
+
+
+```
+
+# 10. FIND SOURCE OF BATCH EFFECT
+## Seek to understand batch effect
+
+### Is variable post-sort cell death as source of batch effect?
+
+Check using mitochondrial genes
+
+```{r}
+# get mitochondrial gene list
+mito_genes <- read.csv('../data/mito_genes/mitogenes_ncbi_11-07-19.txt', sep = '\t', stringsAsFactors = F)
+mito_genes <- mito_genes[which(mito_genes$tax_id == 9606),]
+
+mito_gene_grp <-   data.frame(gene_id = rowData(cds_exp1)[which(rowData(cds_exp1)$gene_short_name %in% mito_genes$Symbol),'id'],
+                              group = 1)
+
+# aggregate expression across all these genes
+colData(cds_exp1)$mito_gene_expr <- aggregate_gene_expression(cds_exp1[as.character(mito_gene_grp$gene_id),],
+                                                              gene_group_df = mito_gene_grp,
+                                        cell_group_df =  NULL,
+                                        norm_method = 'log')
+
+ggplot(as.data.frame(colData(cds_exp1)), aes(x = sample, y = mito_gene_expr)) + geom_boxplot()
+
+plot_cells(cds_exp1, color_cells_by = 'mito_gene_expr') # note that UMAP samples/clusters do not show different levels of MT genes
+
+```
+
+Save the R session
+
+```{r}
+save.image('scrnaseq_analysis.RData')
+```
+

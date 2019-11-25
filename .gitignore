@@ -6,6 +6,6 @@ vcs_nls/nls_scores/data/*
 *.RData
 
 # keep readme files
-!vcs_proof_of_concept/activation_bulk_RNAseq/README.txt
+!vcs_proof_of_concept/activation_bulk_RNAseq/data/README.txt
 !vcs_paclitaxel/scrnaseq/data/cellranger_outputGEO/README.txt
 !vcs_nls/nls_scores/data/README.txt

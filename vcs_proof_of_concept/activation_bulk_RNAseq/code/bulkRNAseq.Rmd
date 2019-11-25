@@ -1,0 +1,211 @@
+---
+title: "RNAseq_activation"
+author: "NH"
+date: "October 16, 2019"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+library(monocle)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(viridis)
+library(ggridges)
+library(GGally)
+})
+```
+
+# load data
+
+```{r}
+sessionInfo()
+```
+
+Function to load cds
+
+```{r}
+load.cds = function(mat.path, gene.annotation.path, cell.annotation.path) {
+df = read.table(
+mat.path,
+col.names = c("gene.idx", "cell.idx", "count"),
+colClasses = c("integer", "integer", "integer"))
+gene.annotations = read.table(
+gene.annotation.path,
+col.names = c("id", "gene_short_name"),
+colClasses = c("character", "character"))
+cell.annotations = read.table(
+cell.annotation.path,
+col.names = c("cell", "sample"),
+colClasses = c("character", "factor"))
+rownames(gene.annotations) = gene.annotations$id
+rownames(cell.annotations) = cell.annotations$cell
+# add a dummy cell to ensure that all genes are included in the matrix
+# even if a gene isn't expressed in any cell
+df = rbind(df, data.frame(
+gene.idx = c(1, nrow(gene.annotations)),
+cell.idx = rep(nrow(cell.annotations)+1, 2),
+count = c(1, 1)))
+mat = sparseMatrix(i = df$gene.idx, j = df$cell.idx, x = df$count)
+mat = mat[, 1:(ncol(mat)-1)]
+print(dim(mat))
+rownames(mat) = gene.annotations$id
+colnames(mat) = cell.annotations$cell
+pd = new("AnnotatedDataFrame", data = cell.annotations)
+fd = new("AnnotatedDataFrame", data = gene.annotations)
+cds = monocle::newCellDataSet(mat, phenoData = pd, featureData = fd, expressionFamily
+= negbinomial.size())
+pData(cds)$n.umi = apply(mat, 2, sum)
+return(cds)
+}
+```
+
+Load cds
+
+Plot the number of umis 
+
+```{r}
+cds = load.cds(
+"../data/UMI.count_bulk_RNAseq.matrix",
+"../data/gene_bulk_RNAseq.annotations",
+"../data/cell_bulk_RNAseq.annotations")
+dim(cds)
+head(fData(cds), 2)
+head(pData(cds), 2)
+```
+
+Filter umis
+
+```{r}
+pd = pData(cds)[(pData(cds)$n.umi> 10000),]
+expression_mat = exprs(cds)[,(pData(cds)$n.umi> 10000)]
+```
+
+Define activated samples
+
+```{r}
+df = data.frame( cell = c("NH1__A12","NH2__B12","NH3__C12","NH4__D12",
+"NH5__E12","NH6__F12","NH7__G12","NH8__H12"),
+activation = c(FALSE, FALSE, TRUE, TRUE,
+TRUE,TRUE,TRUE, TRUE),
+time = c(0, 0, 6, .5, 1.5, 2.5, 3.5, 4.5))
+```
+
+```{r}
+pd = left_join(pd, df)
+```
+
+```{r}
+pd = new("AnnotatedDataFrame", data = pd)
+rownames(pData(pd)) = colnames(expression_mat)
+fd = new("AnnotatedDataFrame", data = fData(cds))
+cds = newCellDataSet(expression_mat, phenoData = pd, featureData = fd, expressionFamily = negbinomial.size())
+```
+
+Preprocess data
+
+```{r}
+cds = estimateSizeFactors(cds)
+cds <- estimateDispersions(cds)
+```
+
+
+```{r}
+pData(cds)
+```
+
+```{r}
+head(rownames(fData(cds))[grepl("^ENSG", fData(cds)$id)])
+```
+
+```{r}
+cds <- reduceDimension(cds,
+max_components = 5,
+norm_method = 'log',
+reduction_method = 'ICA',
+verbose = T)
+```
+
+```{r}
+pData(cds)$ICA1 = cds@reducedDimS[1,]
+pData(cds)$ICA2 = cds@reducedDimS[2,]
+pData(cds)$ICA3 = cds@reducedDimS[3,]
+pData(cds)$ICA4 = cds@reducedDimS[4,]
+```
+
+Look at ICA
+
+```{r}
+ggplot(pData(cds), aes(x = ICA1, y = ICA2, color = Size_Factor))+
+geom_point() +
+theme_classic() +
+scale_color_viridis(option = "inferno")
+```
+
+```{r}
+ggplot(pData(cds), aes(x = ICA2, y = ICA3, color = Size_Factor))+
+geom_point() +
+theme_classic() +
+scale_color_viridis(option = "inferno")
+```
+
+Use DESeq2 to get degs
+
+```{r}
+library("DESeq2")
+dds = DESeqDataSetFromMatrix(countData = exprs(cds),
+colData = pData(cds),
+design = ~ activation)
+dds <- DESeq(dds)
+res <- results(dds)
+res
+```
+
+```{r}
+plotMA(res, ylim=c(-2,2))
+```
+
+```{r}
+resLFC <- lfcShrink(dds, coef="activationTRUE")
+resLFC
+```
+
+```{r}
+plotMA(resLFC, ylim=c(-2,2))
+```
+
+```{r}
+plotDispEsts(dds)
+```
+
+Plot p values
+
+```{r}
+ggplot(as.data.frame(res), aes(x = padj)) + geom_histogram(bins = 500) + theme_classic()
+```
+
+Plot in paper - shows no DEGs < 0.01
+
+```{r}
+to_plot = as.data.frame(res)
+to_plot[nrow(to_plot+1),] = c(NA, NA, NA, NA, NA, 0)
+to_plot[is.na(to_plot$padj), 'padj'] = 1
+to_plot$significant = to_plot$padj < .01
+to_plot$significant = factor(to_plot$significant, levels = c(FALSE, TRUE), ordered=T)
+
+
+ggplot(to_plot, aes(x = log2FoldChange, y = -log10(padj), fill = significant)) +
+  geom_point(size = 1.5, pch=21, color='black') +
+  theme_classic() +
+    theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14)) +
+  ylim(0,2) +
+  xlab("Log2 Fold Change") +
+  scale_fill_manual(values=c('#bababa', '#d7191c')) +
+  geom_hline(yintercept = 2, linetype='dashed') +
+  guides(fill=FALSE)
+
+ggsave('F1C.png', dpi=600, width=3, height=3)
+```
+

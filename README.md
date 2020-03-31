@@ -1,4 +1,4 @@
-# Visual Cell Sorting: A High-throughput, Microscope-based Method to Dissect Cellular Heterogeneity
+High-throughput, Microscope-based Sorting to Dissect Cellular Heterogeneity
 NOTE that all code should be run from the directory the code is located in
 
 ## Directories

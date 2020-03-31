@@ -16,6 +16,7 @@ library(grid)
 library(lattice)
 library(DescTools)
 library(reshape2)
+library(ggpubr)
 
 ## scientific notation
 fancy_scientific <- function(l) {
@@ -359,7 +360,7 @@ flow_plot_data = lapply(file_list, function(file) {
 
 metadat <- cbind(metadat, prop_miRFPpos, AUC_values, spec, sens, fpr, precision)
 
-metadat$expected.prop.miRFP <- as.factor(metadat$expected.prop.miRFP)}
+metadat$expected.prop.miRFP <- as.factor(metadat$expected.prop.miRFP)
 
 
 ```
@@ -467,153 +468,3 @@ ggplot(to_plot, aes(x = expected.prop.miRFP,
 
 ggsave('F1C.png', width = 3.3, height = 3, dpi = 900)
 ```
-
-
-## load data for S1A
-
-```{r}
-data = read.csv('../data/Dendra2Decay_S1A/all_data_filtered_annotated.csv')
-
-head(data)
-```
-
-## Plot S1A
-
-```{r}
-ggplot(data[which(data$activation_ms != 0),], aes(x = ratio, color = as.factor(timepoint))) + 
-  geom_density(data = data[which(data$activation_ms == 0),c('ratio', 'doxycycline')], color = 'grey') +
-  geom_density() +
-  geom_classic() +
-  facet_grid(activation_ms~doxycycline) +
-  scale_color_manual(values = rev(c('#fcbba1','#fc9272','#fb6a4a','#de2d26','#a50f15'))) +
-  xlab('Activated / Unactivated Dendra2') +
-  guides(color=guide_legend(title="Time Since Activation (hr)")) +
-  xlim(-8,0.25)
-
-ggsave('Dendra2_Decay_S1A.png', dpi = 900, width = 7.5, height = 4)
-  
-```
-
-## load data for S1B
-
-```{r}
-data = read.csv('../data/405nm-toxicity_S1B/FloJo-analysis/01-26-18_data.csv', stringsAsFactors = F)
-
-data = melt(data[1:18,], id.vars = c('X', 'activation', 'Replicate'))
-
-# remove data for activated cells in negative/positive control (these cells were never activated) and data for unactivated cells in the activated wells (we are interested in the cell death in activated cells only)
-## column for whether cells were activated
-data$activated = sapply(data$variable, function(s) unlist(strsplit(as.character(s), '\\.'))[3])
-## column for subpop
-data$subpop = sapply(data$variable, function(s) unlist(strsplit(as.character(s), '\\.'))[4])
-## remove any cells which dont EITHER have 
-data = data[which(((data$activation %in% c('negative_control', 'positive_control') & (data$activated == 'unactivated_cells')) | ((data$activation %in% c('2h', '8h', '24h', '48h')) & (data$activated == 'activated_cells'))) & (data$subpop %in% c('apop', 'dead', 'necr'))),]
-## make activation ordered factor
-data[which(data$activation == 'negative_control'),'activation'] = 'NegC'
-data[which(data$activation == 'positive_control'),'activation'] = 'PosC'
-data$activation = factor(data$activation, levels = c('NegC', 'PosC', '2h', '8h', '24h', '48h'))
-
-# relabel the apop etc.
-data$subpop <- factor(data$subpop, levels=c("apop", "necr", "dead"), labels=c("Apoptotic", "Necrotic", "Dead"))
-
-head(data)
-```
-
-## plot S1A (gating scheme)
-
-```{r}
-  # read data
-  x = read.FCS('../data/U2OS activated_C04_018.fcs', transformation=FALSE, alter.names=TRUE)
-  x.toplot = as.data.frame(x@exprs)
-  x.toplot$density = get_density(x.toplot$FSC.A, x.toplot$SSC.A, n = 100)
-  x.plt = ggplot(x.toplot, aes(x=FSC.A, y=SSC.A, color = density)) +
-    theme_classic() +
-    geom_point(size = 0.5) +
-    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'))) +
-    geom_vline(xintercept =25000, linetype='dashed') +
-    geom_hline(yintercept =25000, linetype='dashed') +
-    guides(color = F)
-
-  ## gate out trash
-  x.notrash <- gate_trash(x, FSCA_cutoff = 25000, SSCA_cutoff = 25000)
-  x.notrash.toplot = as.data.frame(x.notrash@exprs)
-  x.notrash.toplot$density = get_density(x.notrash.toplot$FSC.A, x.notrash.toplot$SSC.A, n = 100)
-  x.notrash.plt = ggplot(x.notrash.toplot, aes(x=FSC.A, y=SSC.A, color = density)) +
-    theme_classic() +
-    geom_point(size = 0.5) +
-    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'))) +
-    guides(color = F)
-  
-  # filter for live cell and plot
-  x.live = Subset(x.notrash, filter(x.notrash, live))
-  x.live.toplot = as.data.frame(x.live@exprs)
-  x.live.toplot$density = get_density(x.live.toplot$FSC.A, x.live.toplot$SSC.A, n = 100)
-  x.live.plt = ggplot(x.live.toplot, aes(x=FSC.A, y=SSC.A, color = density)) +
-    geom_point(data = x.notrash.toplot, alpha = 0) +
-    theme_classic() +
-    geom_point(size = 0.5) +
-    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58')))+
-    guides(color = F)
-  
-  # filter for single
-  x.live.toplot$density2 = get_density(x.live.toplot$FSC.A, x.live.toplot$FSC.W, n = 100)
-  x.live.plt2 = ggplot(x.live.toplot, aes(x=FSC.A, y=FSC.W, color = density2)) +
-    #geom_point(data = x.notrash.toplot, alpha = 0) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle =45, hjust=1 ))+
-    geom_point(size = 0.5) +
-    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58')))+
-    guides(color = F) + scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
-    scale_x_continuous(labels = function(x) format(x, scientific = TRUE))
-  
-  # filter for single cell
-  x.single = Subset(x.live, filter(x.live, single))
-  x.single.toplot = as.data.frame(x.single@exprs)
-  x.single.toplot$density = get_density(x.single.toplot$FSC.A, x.single.toplot$FSC.W, n = 100)
-  x.single.plt = ggplot(x.single.toplot, aes(x=FSC.A, y=FSC.W, color = density)) +
-    geom_point(data = x.live.toplot, alpha = 0) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle =45, hjust=1 ))+
-    geom_point(size = 0.5) +
-    scale_colour_gradientn(colours = rev(c('#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58')))+
-    guides(color = F) +
-    scale_y_continuous(labels = function(x) format(x, scientific = TRUE)) +
-    scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) 
-  
-  # extract data and calculate PE/FITC ratio
-  x.live.single <- calc.ratio.extract.data(x.single)
-  # remove rows with data at the minimum value for PE.A, FITC.A
-  x.live.single <- x.live.single[which(x.live.single[,'PE.A.log'] != min(x.live.single[,'PE.A.log'])),]
-  x.live.single <- x.live.single[which(x.live.single[,'FITC.A.log'] != min(x.live.single[,'FITC.A.log'])),]
-  
-  # show dendra2 filter
-  x.live.singleplt = ggplot(x.live.single, aes(x=FITC.A.log)) +
-    geom_histogram(bins = 100) +
-    theme_classic() +
-    geom_vline(xintercept = FITC.gate, linetype = 'dashed')
-  
-  # filter for FITC positive cells
-  x.live.single.FITCpos<-x.live.single[which(x.live.single[,'FITC.A.log'] > FITC.gate),]
-
-S1A = ggarrange(plotlist = list(x.plt, x.notrash.plt, x.live.plt, x.live.plt2, x.single.plt, x.live.singleplt), ncol = 3, nrow = 2)
-
-ggsave('SF1A.png', S1A, width = 7.5, height = 4.5, dpi = 900)
-```
-
-
-## plot S1C
-
-```{r}
-
-
-ggplot(data, aes(x = activation, y = value/100, color = subpop)) + 
-  geom_point(alpha = 0.3, size = 2) +
-  ylab('Percentage') +
-  xlab('Condition') +
-  guides(color=guide_legend(title="Cell Viability")) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1))
-  
-
-ggsave('S1C.png', dpi = 900, width = 4, height = 2.75)
-```
-

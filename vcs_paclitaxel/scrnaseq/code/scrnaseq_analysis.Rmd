@@ -566,7 +566,7 @@ coeffs_taxol_shape_exp2$hvg = coeffs_taxol_shape_exp2$id %in% chosen
 print(sum(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score')) # number of genes significantly associated with lobulation score
 print(sum(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score' & coeffs_taxol_shape_exp2$normalized_effect < 0) / sum(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score')) # number of genes that have higher expression in normal cells
 
-write.csv(coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score'),], 'ST5.csv')
+write.csv(coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$significant_deg & coeffs_taxol_shape_exp2$term == 'shape_score'),], 'Dataset_EV3.csv')
 
 ggplot(coeffs_taxol_shape_exp2[which(coeffs_taxol_shape_exp2$term == 'shape_score'),], aes(x = normalized_effect, y = -log10(q_value), color = significant_deg)) +
   geom_point(size = 1) +
@@ -628,11 +628,11 @@ canonpaths_upreg <- gsea_analysis(upreg_degs,
 hallmarks_downreg <- gsea_analysis(downreg_degs,
                                    universe,
                                    '../data/genesets/h.all.v6.2.symbols.gmt'); hallmarks_downreg = hallmarks_downreg[which(hallmarks_downreg$`Adjusted p-value` < 0.01),] ; write.csv(hallmarks_downreg[order(hallmarks_downreg$`Adjusted p-value`),],
-                                                                                         'ST7.csv')  
+                                                                                         'Dataset_EV5.csv')  
 canonpaths_downreg <- gsea_analysis(downreg_degs,
                               universe,
                               '../data/genesets/c2.cp.v7.0.symbols.gmt'); canonpaths_downreg = canonpaths_downreg[which(canonpaths_downreg$`Adjusted p-value` < 0.01),] ; canonpaths_downreg$prop_genes = canonpaths_downreg$`Significant (in gene set)`/(canonpaths_downreg$`Non-significant (in gene set)`+canonpaths_downreg$`Significant (in gene set)`) ; write.csv(canonpaths_downreg[order(canonpaths_downreg$prop_genes, decreasing = T),],
-                                                                                         'ST6.csv')  
+                                                                                         'Dataset_EV4.csv')  
 
 ```
 

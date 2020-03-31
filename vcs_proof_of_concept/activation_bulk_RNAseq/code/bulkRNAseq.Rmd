@@ -196,16 +196,16 @@ to_plot$significant = factor(to_plot$significant, levels = c(FALSE, TRUE), order
 
 
 ggplot(to_plot, aes(x = log2FoldChange, y = -log10(padj), fill = significant)) +
-  geom_point(size = 1.5, pch=21, color='black') +
+  geom_point(size = 1, pch=21, color='black') +
   theme_classic() +
-    theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14)) +
+    theme(text=element_text(size=10),
+        axis.title=element_text(size=12)) +
   ylim(0,2) +
   xlab("Log2 Fold Change") +
   scale_fill_manual(values=c('#bababa', '#d7191c')) +
   geom_hline(yintercept = 2, linetype='dashed') +
   guides(fill=FALSE)
 
-ggsave('F1C.png', dpi=600, width=3, height=3)
+ggsave('EV1D.png', dpi=600, width=2.75, height=2.75)
 ```
 

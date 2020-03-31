@@ -219,8 +219,8 @@ ggplot(final_plot, aes(x = meanscore, y = meanNC)) +
   geom_errorbarh(aes(xmin = xmin_err, xmax = xmax_err),
                 color = 'grey') +
   geom_point() +
-  stat_smooth(method='lm',
-              se=F) +
+  #stat_smooth(method='lm',
+  #            se=F) +
   theme_classic() +
   annotate(x = -Inf, 
            y = Inf, 

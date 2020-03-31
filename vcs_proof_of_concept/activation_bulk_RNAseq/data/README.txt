@@ -1,5 +1,5 @@
 ## README
-### Download the following files from GEO (accession number XXXX) to this directory:
+### Download the following files from GEO (accession number GSE141030) to this directory:
 
 cell_bulk_RNAseq.annotations
 gene_bulk_RNAseq.annotations

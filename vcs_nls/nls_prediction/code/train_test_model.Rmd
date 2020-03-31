@@ -3,7 +3,7 @@ title: "NLS Precditor"
 author: "Nick Hasle"
 date: "March 20, 2019"
 output: html_document
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -17,10 +17,13 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(bio3d)
 library(UniProt.ws)
+library(seqinr)
 library(reshape2)
 library(dplyr)
 library(biomaRt)
 library(seqinr)
+library(dplyr)
+library(pROC)
 
 ```
 
@@ -149,7 +152,7 @@ calculate_overlap <- function(start_pos, end_pos, start_NLS, end_NLS) {
 ```
 
 ### get position scores
-Get the amino acid preference scores at each position of an NLS, given 
+Get the amino acid preference scores at each position of an NLS, given
 
 ```{r}
 # annotate each potential motif with position-wise scores
@@ -441,33 +444,33 @@ Create a dataframe to plot given proteins (uniprot vector) 11mer scores and any 
 
 # a function that plots a specific set of proteins, given by uniprot vector
 plot_specific <- function(training_df, uniprot_vector, ndata, ncol, to_plot) {
-  
-  # prep location of 
+
+  # prep location of
   subset = training_df[which(training_df$seq_name %in% uniprot_vector),]
   motif_df = melt(unique(ndata[which(ndata$uniprotid %in% uniprot_vector),c('uniprotid', 'NLS_seq', 'NLS_start', 'NLS_end'),]), id.vars = c('uniprotid','NLS_seq'), value.name = 'x') # get NLS start and end values
   num_nls = nrow(motif_df) / 2
   motif_df = motif_df[rep(1:nrow(motif_df), each = 2),]
   motif_df$y = c(rep(c(Inf, -Inf), num_nls), rep(c(-Inf, Inf), num_nls))
-  
+
   colnames(motif_df) = c('seq_name', 'nls_seq', 'pos', 'x', 'y')
-  
+
   # NLS sequence location
   ## include function that iterates through
   ann_df = ndata[which(ndata$uniprotid %in% uniprot_vector),c('uniprotid', 'NLS_seq')]
   colnames(ann_df) = c('seq_name', 'nls_seq')
   ann_df = ann_df[order(ann_df$seq_name),]
   ann_df$nls_ann = unlist(lapply(unique(ann_df$seq_name), function(uniprotid) {
-    
+
     subdf = ann_df[which(ann_df$seq_name == uniprotid),]
     annotation = unlist(sapply(seq(1, nrow(subdf)), function(i) paste0(rep('\n', i-1), 'NLS', i, ':', subdf[i,'nls_seq'])))
-    
+
     return(annotation)
-    
+
   }
-  
+
   ))
-  
-  
+
+
   ggplot(subset) + geom_line(aes_string(x = 'center_pos', group = 'seq_name', y = to_plot)) + facet_wrap(~seq_name, ncol = 3) + geom_polygon(data = motif_df, aes(x = x, y = y, group = nls_seq), fill = '#fc8d59', alpha = 0.5) + geom_text(data = ann_df, y = Inf, x = 0, hjust= 0, vjust = 1, aes(label = nls_ann))
 }
 ```
@@ -480,6 +483,12 @@ humanUp <- UniProt.ws(9606) # set up UniProt web services
 human_ensembl = useMart("ensembl")
 human_ensembl = useDataset("hsapiens_gene_ensembl",
                                mart = human_ensembl)
+
+# get proteome sequences
+proteome = read.fasta(file = '../data/uniprot-proteome_UP000005640_reviewed.FASTA', seqtype='AA', as.string=T)
+proteome_df = data.frame(uniprotid = sapply(names(proteome), function(x) {unlist(strsplit(x, '\\|'))[[2]]}),
+                         aa = sapply(proteome, function(x) x[[1]]),
+                         stringsAsFactors = F)
 
 ```
 
@@ -495,11 +504,11 @@ score_matrix
 
 scores$mt_aa = factor(scores$mt_aa, levels = c('Y', 'W', 'F', 'V', 'P', 'L', 'I', 'G', 'A', 'T', 'S', 'Q', 'N', 'M', 'C', 'E', 'D', 'R', 'K', 'H'), ordered = T)
 
-ggplot(scores, aes(x = aa_pos, y = mt_aa, fill = aa_pref)) + 
-  geom_tile(color = 'black', size = 0.5) + 
-  scale_fill_viridis_c() + 
+ggplot(scores, aes(x = aa_pos, y = mt_aa, fill = aa_pref)) +
+  geom_tile(color = 'black', size = 0.5) +
+  scale_fill_viridis_c() +
   theme_classic() +
-  theme(axis.text=element_text(size=14), 
+  theme(axis.text=element_text(size=14),
         axis.title=element_text(size=16),
         legend.title = element_text(size = 16),
         legend.text = element_text(size = 14, angle = 45, hjust = 1),
@@ -516,16 +525,17 @@ ggsave('preference_matrix.png', width = 3.5, height = 6, dpi = 900)
 
 ## Check whether known monopartite NLS's have high scores, relative to other candidate motifs in the same protein
  * SV40 NLS (P03070); PMID
- * cMyc NLS (P01106); PMID 
- * HNF1beta NLS (P35680); PMID 27346421 
- * NRF2beta NLS (Q16236); PMID 23856623 
+ * cMyc NLS (P01106); PMID
+ * HNF1beta NLS (P35680); PMID 27346421
+ * NRF2beta NLS (Q16236); PMID 23856623
 
 ```{r}
 ## get sequence data for human proteins
+
 UPids = c('P03070', 'P01106', 'P35680', 'Q06547')
-pdata_monopartite = UniProt.ws::select(humanUp, 
+pdata_monopartite = UniProt.ws::select(humanUp,
                                        keys = UPids,
-                                       columns = 'SEQUENCE', 
+                                       columns = 'SEQUENCE',
                                        kt = 'UNIPROTKB')
 colnames(pdata_monopartite) = c('uniprotid', 'aa')
 
@@ -535,7 +545,7 @@ pdata_monopartite[1,'aa'] = "MDKVLNREESLQLMDLLGLERSAWGNIPLMRKAYLKKCKEFHPDKGGDEEK
 # prepare NLS data
 ndata_monopartite = data.frame(uniprotid = UPids,
                                NLS_start = c(125, 320, 229, 323),
-                               NLS_end = c(132, 328, 235, 333), 
+                               NLS_end = c(132, 328, 235, 333),
                                NLS_name = sapply(pdata_monopartite$uniprotid, function(upid) paste0(unlist(upid), '_1'))
 )
 
@@ -571,15 +581,11 @@ uP_nls_human$NLS_end = sapply(uP_nls_human$end, function(x) as.numeric(unlist(st
 
 # make two dataframes: one with protein level information, and one with motif-level information
 ## pdata df (protien info)
-pdata = unique(uP_nls_human[,c('uniprotid', 'aa')]) 
+pdata = unique(uP_nls_human[,c('uniprotid', 'aa')])
 pdata$aa = as.character(pdata$aa)
 pdata = pdata[which(pdata$uniprotid %in% UniProt.ws::keys(x = humanUp, keytype = 'UNIPROTKB')),]
-canonical_seqs = which(pdata$aa %in%
-                           sapply(unique(pdata$uniprotid), function(x) UniProt.ws::select(humanUp, 
-                                                                                          keys = x,
-                                                                                          columns = 'SEQUENCE', 
-                                                                                          kt = 'UNIPROTKB')$SEQUENCE))
-  
+canonical_seqs = which(pdata$aa %in% proteome_df[which(proteome_df$uniprotid %in% pdata$uniprotid),'aa'])
+
   pdata = pdata[canonical_seqs,]
   pdata = pdata[which(!(pdata$uniprotid == 'Q9UBP0' & sapply(pdata$aa, nchar) == 584)),] # uniprotid Q9UBP0 has multiple sequences returned by uniprot.ws; picking the one with the same length as the canonical sequence on the website (616, i.e. NOT 584)
   row.names(pdata) = pdata$uniprotid
@@ -615,7 +621,7 @@ ndata$num_KR = sapply(seq(1, nrow(ndata)), function(i) {
 
 head(pdata)
 head(ndata)
-``` 
+```
 
 # ANNOTATE TRAINING DATA SEQUENCES WITH PREFERENCE SCORES
 
@@ -624,75 +630,75 @@ annotation_df_uniprot <- compute_prediction_df(pdata, score_matrix, ndata)
 
 print(paste0('Number of proteins:', length(unique(annotation_df_uniprot[,'seq_name']))))
 ```
- 
+
 # USE 8-FOLD CROSS-VALIDATION TO DERIVE POSITION-WISE PREFERENCE WEIGHTS
 ### cross_validation_test
-This function takes a list of uniprotid vectors ("scrambled"), the annotated training dataframe ("training_df"), the NLS dataframe ("ndata"), a regression function that uses columns of the annotated training dataframe as predictor variables ("regression function"), and a boolean indicating whether the training sequences must 1. overlap with the top-scoring NLS and 2. be the top-ranking unweighted 11mer ("pick_top_rank_only"). The output of the function is three objects arranged in a list: 
- * (1) a summary dataframe, with the proportion of training NLS's overlapping with the top-ranked 11mer in the weighted model OR in the top 5 ranked 11mers of the weighted model (columns 1 and 2); the median proportion of overlap between the top-ranking 11mer and the known NLS (column 3); and the intercept and position-wise weights of the model; each row is a separate cross-validation test, leaving out a different set of uniprot ids. 
+This function takes a list of uniprotid vectors ("scrambled"), the annotated training dataframe ("training_df"), the NLS dataframe ("ndata"), a regression function that uses columns of the annotated training dataframe as predictor variables ("regression function"), and a boolean indicating whether the training sequences must 1. overlap with the top-scoring NLS and 2. be the top-ranking unweighted 11mer ("pick_top_rank_only"). The output of the function is three objects arranged in a list:
+ * (1) a summary dataframe, with the proportion of training NLS's overlapping with the top-ranked 11mer in the weighted model OR in the top 5 ranked 11mers of the weighted model (columns 1 and 2); the median proportion of overlap between the top-ranking 11mer and the known NLS (column 3); and the intercept and position-wise weights of the model; each row is a separate cross-validation test, leaving out a different set of uniprot ids.
  * (2) a model summary of the full model on all proteins in the training dataset
 
 ```{r}
 cross_validation_test <- function(scrambled, training_df, ndata, regression_function, pick_top_rank_only) {
-  
+
   # calculate ranks based on score
   print('Calculating ranks for NLSs based on pssm score (even weights)..')
   ndata_ranks = get_min_ranks_NLS(training_df, ndata, 'pssm_score')
-  
+
   # create and return the dataframe with cross validation rank metrics
   final_output = lapply(unique(names(scrambled)), function(chunk_name) {
-    
+
     print(paste0('Running chunk ', chunk_name, '..'))
-  
+
     train = training_df[which(training_df$seq_name %in% scrambled[which(names(scrambled) != chunk_name)]),] # train = those not in this test chunk
     test = training_df[which(training_df$seq_name %in% scrambled[which(names(scrambled) == chunk_name)]),] # test = those in the test chunk
-    
+
     # find training sequences
     print('Finding training sequences..')
     if(pick_top_rank_only) { # take all windows that overlap with the NLS AND are ranked 1 amongst all windows in the protein
       toprank = ndata_ranks[which(ndata_ranks$rank == 1),]
-      
+
     } else { # take the top scoring window for each NLS
       toprank = ndata_ranks[which(ndata_ranks$uniprotid.x %in% train$seq_name),]
       }
-    
+
     # annotate training dataset with the putative NLS's
     train$seq_name = as.character(train$seq_name)
-    train = merge(train, 
+    train = merge(train,
                   toprank[,c('uniprotid.x', 'motif_start', 'rank')],
-                  by.x = c('seq_name', 'start_pos'), 
+                  by.x = c('seq_name', 'start_pos'),
                   by.y = c('uniprotid.x', 'motif_start'),
                   all.x = T)
     train$likely_monopartite = F
     train[which(!is.na(train$rank)),'likely_monopartite'] = T
     train_median_overlap_score = median(train[which(train$likely_monopartite),'prop_overlap'])
-    
+
     # generate and test model
     print('Generating and testing model..')
     glm_pos <- regression_function(data = train)
     coeffs = glm_pos$coefficients
-    
+
     # get the ranks using the training data-derived glm
     test$predicted_glm = stats::predict(glm_pos, test)
     ranks_predicted = get_min_ranks_NLS(test, ndata, 'predicted_glm')
 
-    
+
     output = c(prop_toprank_glm = sum(ranks_predicted$rank == 1) / nrow(ranks_predicted),
                prop_topfive_glm = sum(ranks_predicted$rank < 6) / nrow(ranks_predicted),
                test_median_overlap_glm = median(ranks_predicted$prop_overlap))
-    
+
     names(output) = c('prop_toprank_glm', 'prop_topfive_glm', 'test_median_overlap_glm')
-    
+
     # retrieve the scores of the hits and the misses
     test$likely_monopartite = F
     test[which(!is.na(test$rank)),'likely_monopartite'] = T
     predictions_df = test[,c('likely_monopartite', 'predicted_glm')]
-    
+
     output = list(c(output, coeffs), predictions_df, glm_pos)
-    
+
     return(output)
-    
+
   })
-  
+
   # reformat the output
   final_output_df = lapply(final_output, function(i) i[[1]])
   #final_output_vals = lapply(final_output, function(i) i[[2]])
@@ -701,27 +707,27 @@ cross_validation_test <- function(scrambled, training_df, ndata, regression_func
   final_output_df = bind_rows(final_output_df)
   final_output_df = t(final_output_df) # make each row a chunk
   colnames(final_output_df) = c('prop_toprank_glm', 'prop_topfive_glm', 'test_median_overlap_glm', names(final_output[[1]][[3]]$coefficients))
-  
+
   # get the toprank of all motifs
   toprank = ndata_ranks[which(ndata_ranks$uniprotid.x %in% training_df$seq_name),]
-  
+
   # return the full model
-  training_df = merge(training_df, 
+  training_df = merge(training_df,
                   toprank[,c('uniprotid.x', 'motif_start', 'rank')],
-                  by.x = c('seq_name', 'start_pos'), 
+                  by.x = c('seq_name', 'start_pos'),
                   by.y = c('uniprotid.x', 'motif_start'),
                   all.x = T)
   training_df$likely_monopartite = F
   training_df[which(!is.na(training_df$rank)),'likely_monopartite'] = T
   glm_pos_all <- regression_function(data = training_df)
-  
+
   to_return = list(as.data.frame(final_output_df),
                    #final_output_vals,
                    glm_pos_all)
-  names(to_return) = c('summary', 
-                       #'hpa_data_scores', 
+  names(to_return) = c('summary',
+                       #'hpa_data_scores',
                        'model_all_data')
-  
+
   return(to_return)
 }
 
@@ -733,13 +739,13 @@ names(scrambled) = cut(seq(1, length(scrambled)), 8)
 # define the original and the position-wise function
 glm_original <- function(data) {
   glm(likely_monopartite ~ pssm_score,
-      data = data 
+      data = data
            )
 }
 
 glm_position_based <- function(data) {
   glm(likely_monopartite ~ pos1 + pos2 + pos3 + pos4 + pos5 + pos6 + pos7 + pos8 + pos9 + pos10 + pos11,
-      data = data 
+      data = data
            )
 }
 
@@ -770,11 +776,11 @@ scores$weight = sapply(scores$aa_pos, function(x) {
 
 scores$weighted_aa_pref = scores$aa_pref * scores$weight
 
-ggplot(scores, aes(x = aa_pos, y = mt_aa, fill = weighted_aa_pref)) + 
-  geom_tile(color = 'black', size = 0.5) + 
-  scale_fill_viridis_c() + 
+ggplot(scores, aes(x = aa_pos, y = mt_aa, fill = weighted_aa_pref)) +
+  geom_tile(color = 'black', size = 0.5) +
+  scale_fill_viridis_c() +
   theme_classic() +
-  theme(axis.text=element_text(size=14), 
+  theme(axis.text=element_text(size=14),
         axis.title=element_text(size=16),
         legend.title = element_text(size = 16),
         legend.text = element_text(size = 14),
@@ -796,7 +802,7 @@ Check whether the top-scoring 11mer overlaps with the annotated NLS more frequen
 # compare the performance of the summary dataframes
 glm_original_XV$summary$model = 'Unweighted'
 glm_position_based_XV$summary$model = 'Position-weighted'
-to_plot = melt(rbind(glm_original_XV$summary[,c('prop_toprank_glm', 'prop_topfive_glm', 'model')], 
+to_plot = melt(rbind(glm_original_XV$summary[,c('prop_toprank_glm', 'prop_topfive_glm', 'model')],
                      glm_position_based_XV$summary[,c('prop_toprank_glm', 'prop_topfive_glm', 'model')]),
                id.vars = 'model')
 to_plot$model = factor(to_plot$model, levels = c('Unweighted', 'Position-weighted'), ordered = T)
@@ -806,7 +812,7 @@ ggplot(to_plot, aes(x = interaction(model, variable), color = model, group = var
 scores_monopartite_df$position_weighted_score = stats::predict(glm_position_based_XV$model_all_data, scores_monopartite_df)
 
 # plot proteins
-plot_specific(scores_monopartite_df, unique(scores_monopartite_df$seq_name 
+plot_specific(scores_monopartite_df, unique(scores_monopartite_df$seq_name
                                             ), ndata_monopartite, 1, 'position_weighted_score')
 get_min_ranks_NLS(scores_monopartite_df, ndata_monopartite, 'position_weighted_score')
 
@@ -820,7 +826,7 @@ glm_position_based_XV$model_all_data$coefficients
 
 ```{r}
 # apply to training data
-annotation_df_uniprot$position_weighted_score = stats::predict(glm_position_based_XV$model_all_data, annotation_df_uniprot) 
+annotation_df_uniprot$position_weighted_score = stats::predict(glm_position_based_XV$model_all_data, annotation_df_uniprot)
 
 # do a precision recall curve for many possible bounds
 precision_recall_trainingdata = as.data.frame(t(sapply(seq(min(annotation_df_uniprot$position_weighted_score), max(annotation_df_uniprot$position_weighted_score), length.out = 1000), function(val) {
@@ -853,25 +859,18 @@ ndata_lin <- ndata_lin[which(ndata_lin$organism == 'HUMAN'),]
 
 # get uniprot ids
 ## fasta file is from pasting the first column of the lin_ST2 dataframe into uniprot
-pdata_lin = read.fasta('../data/2013-Lin_ST2_UNIPROT.fasta')
-pdata_lin <- as.data.frame(t(bind_rows(lapply(pdata_lin, function(fasta) {
-  
-  # retrieve the name attribute and parse the sequence
-  name = attr(fasta, 'name')
-  uniprot_entry = unlist(strsplit(name, '\\|'))[[3]]
-  uniprotid = unlist(strsplit(name, '\\|'))[[2]]
-  sequence = paste(toupper(unlist(fasta)), collapse = '')
-  
-  # make a named list with name, sequence
-  output = c(uniprot_entry, uniprotid, sequence)
-  return(output)
-  
-}))))
+human_pdata_lin = sapply(bio3d::read.fasta('../data/2013-Lin_ST2_UNIPROT.fasta')[[1]], function(x) unlist(strsplit(x, '_'))[[2]] == 'HUMAN')
 
-colnames(pdata_lin) = c('UniProtKB.ID', 'uniprotid', 'seq')
-pdata_lin = as.data.frame(apply(pdata_lin, 2, as.character), stringsAsFactors=F)
-pdata_lin = pdata_lin[which(sapply(pdata_lin$UniProtKB.ID, function(entry_name) unlist(strsplit(entry_name, '_'))[[2]]) == 'HUMAN'),]
+# get proteome sequences
+pdata_lin = seqinr::read.fasta(file = '../data/2013-Lin_ST2_UNIPROT.fasta', seqtype='AA', as.string=T)
+pdata_lin = data.frame(UniProtKB.ID = sapply(names(pdata_lin), function(x) {unlist(strsplit(x, '\\|'))[[3]]}),
+                          uniprotid = sapply(names(pdata_lin), function(x) {unlist(strsplit(x, '\\|'))[[2]]}),
+                         aa = sapply(pdata_lin, function(x) x[[1]]),
+                         stringsAsFactors = F)
+pdata_lin = pdata_lin[which(human_pdata_lin),]
+
 colnames(pdata_lin) <- c('UniProtKB.ID', 'uniprotid', 'aa')
+
 # remove any data in the training data
 pdata_lin <- pdata_lin[which(!(pdata_lin$uniprotid %in% pdata$uniprotid)),]
 
@@ -880,7 +879,7 @@ ndata_lin[which((!ndata_lin$UniProtKB.ID %in% pdata_lin$UniProtKB.ID)),'UniProtK
 ndata_lin <- ndata_lin[which((ndata_lin$UniProtKB.ID %in% pdata_lin$UniProtKB.ID)),] # .. so we filter it out
 ndata_lin <- merge(ndata_lin, unique(pdata_lin[,c('UniProtKB.ID', 'uniprotid')]), by='UniProtKB.ID')
 ndata_lin$NLS_seq <- sapply(seq(1, nrow(ndata_lin)), function(i) {
-  
+
   NLS_start = ndata_lin[i,'Start']
   NLS_end = ndata_lin[i,'Stop']
   NLS_seq = substr(pdata_lin[which(pdata_lin$UniProtKB.ID == ndata_lin[i,'UniProtKB.ID']),'aa'], NLS_start, NLS_end)
@@ -888,7 +887,7 @@ ndata_lin$NLS_seq <- sapply(seq(1, nrow(ndata_lin)), function(i) {
   return(NLS_seq)
 })
 ndata_lin$NLS_name = unlist(sapply(unique(ndata_lin$uniprotid), function(uPid) {
-  
+
   subdf = ndata_lin[which(ndata_lin$uniprotid == uPid),] # grab all NLS with matching uPid
   row.names(subdf) = seq(1, nrow(subdf)) # reset row names
   output = sapply(row.names(subdf), function(i) paste0(uPid, '_', i))
@@ -908,7 +907,7 @@ test_annotated <- compute_prediction_df(ndata = ndata_lin, pdata = pdata_lin, sc
 ```
 
 # CALCULATE PRECISION / RECALL ON TESTING DATA
- 
+
 ```{r}
 # use the model to predict NLS
 test_annotated$position_weighted_score = stats::predict(glm_position_based_XV$model_all_data, test_annotated)
@@ -971,9 +970,9 @@ precision_recall_nlsseq = as.data.frame(t(sapply(seq(min(lin_nls_seq_predictions
   FN = sum(!(ndata_lin$NLS_name %in% lin_nls_seq_predictions[which(lin_nls_seq_predictions$nlsseq_score > val),'NLS_name']))
   out = c(val, TP / TPFP, TP / (TP + FN))
   names(out) = c('cutoff', 'precision', 'recall')
-  
+
   return(out)
-  
+
 })))
 
 # remove na
@@ -1025,9 +1024,9 @@ precision_recall_nlstradamus = as.data.frame(t(sapply(seq(min(nlstradamus_predic
   FN = sum(!(ndata_lin$NLS_name %in% nlstradamus_predictions[which(nlstradamus_predictions$cutoff > val),'NLS_name']))
   out = c(val, TP / TPFP, TP / (TP + FN))
   names(out) = c('cutoff', 'precision', 'recall')
-  
+
   return(out)
-  
+
 })))
 
 # remove na
@@ -1042,22 +1041,22 @@ precision_recall_nlstradamus$data = 'nlstradamus'
 ```{r}
 canonical_ndata_lin = bind_rows(lapply(pdata_lin$uniprotid, function(x) {
   aa = pdata_lin[which(pdata_lin$uniprotid == x),'aa']
-  
+
   split_aa = strsplit(aa, '')
-  
+
   hits = sapply(seq(1, (nchar(aa) - 3)), function(y) {
-                      
+
       to_check = paste0(unlist(split_aa)[y:(y+3)])
       check_for_motif(aa = to_check,
       NLS_start = 1,
       NLS_end = 4,
       motif = 'K,K/R,X,K/R')})
-  
+
   out_df = data.frame(uniprotid = x,
                       start_pos = seq(1, (nchar(aa) - 3)),
                       end_pos = seq(4, (nchar(aa))),
                       hit = hits)
-   
+
 }))
 
 prop_overlap = as.data.frame(t(apply(canonical_ndata_lin, 1, function(row) {
@@ -1097,10 +1096,10 @@ print(out)
 precision_recall_test$data = 'our_model'
 all_predictors <- rbind(precision_recall_test, precision_recall_nlsseq, precision_recall_nlstradamus)
 
-ggplot(all_predictors, aes(x = recall, y = precision)) + 
+ggplot(all_predictors, aes(x = recall, y = precision)) +
   geom_line(aes(color = data), size = 1) +
     theme_classic() +
-  theme(axis.text=element_text(size=14), 
+  theme(axis.text=element_text(size=14),
         axis.title=element_text(size=16),
         axis.text.x=element_text(angle = 45, hjust = 1)) +
   ylab('Precision') +
@@ -1112,37 +1111,9 @@ ggplot(all_predictors, aes(x = recall, y = precision)) +
 
 ggsave('F3D.png', dpi= 900, width = 2.75, height = 2.75)
 
-```
-
-# COMPARE NLS PREDICTIONS DIRECTLY
-
-```{r}
-find_best_score <- function(df, model_name, score_col) { # helper function that picks the best score for each bona-fide NLS
-  best_scores <- sapply(ndata_lin$NLS_name, function(x) {
-    subset = df[which(df$NLS_name == x),]
-    if(nrow(subset) == 0) {return(0)} else {
-    best_score = subset[which(subset[score_col] == max(subset[score_col])),score_col]
-    return(best_score)}})
-  
-  out = data.frame(ndata_lin$NLS_name,
-                   ndata_lin$motif,
-                   best_scores)
-  
-  colnames(out) = c('NLS_name', 'motif', model_name)
-  return(out)
-}
-
-best_ourmodel <- find_best_score(test_annotated, 'our_model', 'position_weighted_score')
-best_seqnls <- find_best_score(lin_nls_seq_predictions, 'seqNLS', 'nlsseq_score')
-best_tradamus <- find_best_score(nlstradamus_predictions, 'NLStradamus', 'cutoff')
-
-best_nls_df = Reduce(merge, list(best_ourmodel, best_seqnls, best_tradamus))
-best_nls_df = melt(best_nls_df, id.vars = c('NLS_name', 'our_model', 'motif'))
-
-ggplot(best_nls_df, aes(x = value, y = our_model)) + geom_point() + geom_hline(yintercept = candidate, linetype = 'dashed') + ggrepel::geom_text_repel(aes(label = motif)) + facet_wrap(~variable)
+#save.image('temp1.RData')
 
 ```
-
 
 # USE OUR MODEL TO PREDICT NLS'S IN HUMAN NUCLEAR PROTEOME
 Data on localization is from the publication by Thul et al. (2017) entitled, "A subcellular map of the human proteome"
@@ -1153,25 +1124,16 @@ hpa_subcell$Uniprot = as.character(hpa_subcell$Uniprot)
 nuc_loc = c('Nucleus', 'Nucleoplasm', 'Nuclear.bodies', 'Nuclear.speckles', 'Nucleoli', "Nucleoli..Fibrillar.center.")
 hpa_subcell$any_nucleus = apply(hpa_subcell[,nuc_loc], 1,
         function(row) {
-  
+
   # if all values are 0, return 0
         if(all(row == 0)) { return(F) } else {return(T)}
 })
 
 # get columns of interest
 hpa_data = hpa_subcell[which(hpa_subcell$any_nucleus),c(1,2,3)]
-hpa_data = hpa_data[which(hpa_data$Uniprot %in% keys(humanUp, 'UNIPROTKB')),]
-
-
-
 
 # make a dataframe and retrieve sequences using the fasta files of the human proteome
-aas = sapply(unique(hpa_data$Uniprot), function(x) UniProt.ws::select(humanUp, 
-                                                                      keys = x,
-                                                                      columns = 'SEQUENCE', 
-                                                                      kt = 'UNIPROTKB'))
-
-hpa_data = merge(hpa_data, as.data.frame(t(aas)), by.x = 'Uniprot', by.y = 'UNIPROTKB')
+hpa_data = merge(hpa_subcell[,c('ENSG','Gene','Uniprot')], proteome_df, by.x = 'Uniprot', by.y = 'uniprotid')
 
 # remove rows for which a sequence could not be found
 
@@ -1208,6 +1170,108 @@ sum(hpa_data_prediction_df_nls_candidates$prediction == 'High confidence NLS')
 sum(hpa_data_prediction_df_nls_candidates$prediction == 'High confidence NLS' & !(hpa_data_prediction_df_nls_candidates$canonical_nls))
 sum(hpa_data_prediction_df_nls_candidates$prediction == 'Candidate NLS' & !(hpa_data_prediction_df_nls_candidates$canonical_nls))
 
-write.csv(x = hpa_data_prediction_df_nls_candidates, file = 'ST3.csv')
+write.csv(x = hpa_data_prediction_df_nls_candidates, file = 'Dataset_EV2.csv')
 
+#save.image('temp2.RData')
+```
+
+# DETERMINE WHETHER THE MODEL CAN DISTINGUISH BETWEEN NUCLEAR AND CYTOPLASMIC PROTEINS
+Examine the distributions of the top-scoring 11mer within proteins only found in the nucleus versus those only found in the cytoplasm
+
+
+```{r}
+hpa_subcell <- read.csv('../data/aal3321_Thul_SM_table_S6.csv')
+hpa_subcell$Uniprot = as.character(hpa_subcell$Uniprot)
+nuc_loc = c('Nucleus', 'Nucleoplasm', 'Nuclear.bodies', 'Nuclear.speckles', 'Nucleoli', "Nucleoli..Fibrillar.center.")
+cyto_loc = c('Cytosol', 'Cytoplasmic.bodies')
+all_locs = colnames(hpa_subcell)[4:32]
+not_nuc_cyto = all_locs[which(!(all_locs %in% union(nuc_loc, cyto_loc)))]
+hpa_subcell$localization = apply(hpa_subcell[,4:32], 1,
+        function(row) {
+        # annotate if only nuclear
+        if(any(row[nuc_loc]) & !any(row[not_nuc_cyto]) & !any(row[ cyto_loc])){return('only_nuclear')} else {
+          # annotate if only cytoplasmic
+          if(!any(row[nuc_loc]) & !any(row[not_nuc_cyto]) & any(row[ cyto_loc])){return('only_cytoplasmic')} else {
+            return('other')
+          }
+          }
+})
+
+# make a dataframe and retrieve sequences using the fasta files of the human proteome
+hpa_data = merge(hpa_subcell[which(hpa_subcell$localization %in% c('only_cytoplasmic', 'only_nuclear')),c('ENSG','Gene','Uniprot','localization')], proteome_df, by.x = 'Uniprot', by.y = 'uniprotid')
+
+# remove rows containing any non-canonical amino acids (e.g. U)
+passing_rows = which(sapply(hpa_data$aa, function(aa) all(unlist(strsplit(aa, '')) %in% c('R', 'H', 'K', 'D', 'E', 'S', 'T', 'N', 'Q', 'C', 'G', 'P', 'A', 'V', 'I', 'L', 'M', 'F', 'Y', 'W'))))
+hpa_data = hpa_data[passing_rows,]
+colnames(hpa_data) = c('uniprotid', 'ENSG', 'Gene', 'localization', 'aa')
+
+
+# make predictions
+hpa_data_prediction_df <- compute_prediction_df(pdata = hpa_data, score_matrix = score_matrix, ndata = NULL)
+hpa_data_prediction_df <- merge(hpa_data_prediction_df, hpa_data[,c('uniprotid', 'Gene')], by.x = 'seq_name', by.y = 'uniprotid')
+
+hpa_data_prediction_df$position_weighted_score = stats::predict(glm_position_based_XV$model_all_data, hpa_data_prediction_df)
+
+# return the highest score for each protein
+hpa_data$high_scores = sapply(hpa_data$uniprotid, function(x) {
+  max(hpa_data_prediction_df[which(hpa_data_prediction_df$seq_name == x),'position_weighted_score'])
+})
+
+hpa_data = hpa_data[order(hpa_data$high_scores, decreasing = T),]; hpa_data$high_score_rank = seq(1,nrow(hpa_data))
+hpa_data$rank_bin = as.factor(cut(hpa_data$high_score_rank, 30, dig.lab=4 ))
+
+
+wilcox.test(x = hpa_data[which(hpa_data$localization == 'only_nuclear'),'high_scores'],
+            y = hpa_data[which(hpa_data$localization == 'only_cytoplasmic'),'high_scores'])
+
+hpa_data$Localization = 'Nuclear'
+hpa_data[which(hpa_data$localization == 'only_cytoplasmic'),'Localization'] = 'Cytoplasmic'
+
+ggplot(hpa_data, aes(x = Localization, y = high_scores, fill = Localization)) + geom_boxplot() +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title = element_text(size = 14)) +
+  scale_fill_manual(values = c('#d73027', '#4575b4')) +
+  ylab('Max 11-mer score') + xlab('Localization') +
+  guides(fill = FALSE)
+
+ggsave('SF3B.png', width = 3, height = 3, dpi = 600)
+
+ggplot(hpa_data, aes(x = rank_bin, fill = localization)) + geom_bar(position='fill', color = 'grey') +
+  theme_classic() +
+  geom_hline(yintercept = 2894/(1031+2894), linetype = 'dashed') +
+  scale_y_continuous(limits=c(0, 1), expand = c(0, 0)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title = element_text(size = 14)) +
+  scale_fill_manual(values = c('#d73027', '#4575b4')) +
+  ylab('Proportion') + xlab('NLS Predictor Score Rank')
+
+ggsave('SF3C.png', width = 8, height = 3, dpi = 600)
+
+# plot ROC
+hpa_proc = pROC::roc(hpa_data$localization == 'only_nuclear', hpa_data$high_scores)
+hpa_proc_df = data.frame(cutoff = hpa_proc$thresholds,
+                              sens = hpa_proc$sensitivities,
+                              spec = hpa_proc$specificities)
+
+
+
+ggplot(hpa_proc_df, aes(x = 1-sens, y = spec)) + geom_line() + geom_abline(linetype = 'dashed')
+
+# make an odds ratio plot
+high_thresh = high_confidence
+TP = sum(hpa_data$high_scores > high_thresh & hpa_data$localization == 'only_nuclear')
+FP = sum(hpa_data$high_scores > high_thresh & hpa_data$localization == 'only_cytoplasmic')
+TN = sum(hpa_data$high_scores < high_thresh & hpa_data$localization == 'only_cytoplasmic')
+FN = sum(hpa_data$high_scores < high_thresh & hpa_data$localization == 'only_nuclear')
+
+
+sens = TP /(TP + FN)
+spec = TN /(TN + FP)
+OR_nuc_ifhighthresh = (TP/FP)/(FN/TN)
+acc = (TP + TN)/(TP + TN + FP + FN)
+
+#save.image('temp3.RData')
 ```

@@ -1,5 +1,5 @@
 ## README
-### Download the following files from GEO (accession number XXXX) to this directory:
+### Download the following processed data files from GEO (accession number GSE141030) to this directory:
 
 matrix_exp1.mtx
 matrix_exp1_unfiltered.mtx
